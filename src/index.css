@@ -9,3 +9,8 @@
   .btn-ghost { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100; }
   .chip { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
 }
+
+.route-dash { animation: route-dash 1.2s linear infinite; }
+@keyframes route-dash { to { stroke-dashoffset: -15; } }
+.city-pulse { transform-box: fill-box; transform-origin: center; animation: city-pulse 2s ease-out infinite; }
+@keyframes city-pulse { 0% { transform: scale(0.8); opacity: 0.35; } 100% { transform: scale(2); opacity: 0; } }
