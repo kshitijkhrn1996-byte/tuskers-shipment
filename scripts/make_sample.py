@@ -13,23 +13,23 @@ ITEM_HEADERS = ["Booking ID", "SKU", "Description", "HS code", "Quantity (units)
 
 BOOKINGS = [
     # clean
-    ["BK-001", "Northfield Goods", "Manchester", "United Kingdom", "Frankfurt", "Germany", "Warehouse",
+    ["BK-006", "Northfield Goods", "Manchester", "United Kingdom", "Frankfurt", "Germany", "Warehouse",
      "05-11-2026", "Cheapest", 3, 90, 5400, "GBP", 620, "Yes"],
     # R-02 value off, R-08 no appointment
     ["BK-002", "Thames Textiles", "London", "United Kingdom", "Paris", "France", "Warehouse",
      "10-11-2026", "Fastest", 2, 60, 4000, "GBP", 380, "No"],
-    # R-01 short HS, R-03 carton maths, R-09 missing origin
+    # R-01 short HS, R-03 carton maths, R-09 missing origin, R-07 gross < net
     ["BK-003", "Pennine Home", "Leeds", "United Kingdom", "Amsterdam", "Netherlands", "Business address",
-     "12-11-2026", "Balanced", 2, 50, 3000, "GBP", 450, "No"],
-    # R-05 too heavy for every carrier, R-07 gross < net
+     "12-11-2026", "Balanced", 2, 50, 3000, "GBP", 300, "No"],
+    # R-05 too heavy for every carrier (800 kg on one pallet, max 750)
     ["BK-004", "Brum Hardware", "Birmingham", "United Kingdom", "Hamburg", "Germany", "Business address",
-     "15-11-2026", "Most reliable", 1, 40, 2400, "GBP", 650, "No"],
+     "15-11-2026", "Most reliable", 1, 40, 2400, "GBP", 800, "No"],
     # R-06 lithium, R-04 carton total, R-10 date in the past
     ["BK-005", "Gadget Lane", "London", "United Kingdom", "Lyon", "France", "Warehouse",
      "01-10-2026", "Balanced", 2, 50, 6000, "GBP", 300, "Yes"],
 ]
 ITEMS = [
-    ["BK-001", "MUG-01", "Ceramic coffee mug, 350 ml", 691200, 1080, 5.00, 12, 90, 0.5, "United Kingdom"],
+    ["BK-006", "MUG-01", "Ceramic coffee mug, 350 ml", 691200, 1080, 5.00, 12, 90, 0.5, "United Kingdom"],
     ["BK-002", "TSH-01", "Cotton t-shirt", 610910, 600, 6.00, 20, 30, 0.2, "India"],
     ["BK-002", "SCF-02", "Wool scarf", 611710, 300, 4.00, 10, 30, 0.15, "Turkey"],
     ["BK-003", "LMP-01", "Table lamp", 9405, 200, 10.00, 4, 50, 1.5, "China"],

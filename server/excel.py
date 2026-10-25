@@ -28,6 +28,23 @@ ITEM_COLS = {
 }
 
 
+# Row 3 of the template is a grey example. Judges enter data from row 4, so
+# skip that row only if it is left in exactly as shipped.
+EXAMPLE_ROWS = {
+    ("BK-001", "Northfield Goods", "Manchester", "United Kingdom", "Frankfurt", "Germany", "Warehouse",
+     "05-11-2026", "Cheapest", "3", "90", "5400", "GBP", "620", "Yes"),
+    ("BK-001", "MUG-01", "Ceramic coffee mug, 350 ml", "691200", "1080", "5", "12", "90", "0.5", "United Kingdom"),
+}
+
+
+def _is_example(row) -> bool:
+    def norm(v):
+        if isinstance(v, float) and v.is_integer():
+            v = int(v)
+        return str(v).strip() if v is not None else ""
+    return tuple(norm(v) for v in row if v is not None) in EXAMPLE_ROWS
+
+
 class RowError(BaseModel):
     booking_id: str
     errors: list[str]
@@ -43,6 +60,8 @@ def _rows(ws, colmap: dict[str, str]) -> list[dict]:
     header_idx: Optional[dict[int, str]] = None
     out = []
     for row in rows:
+        if header_idx is not None and _is_example(row):
+            continue
         if header_idx is None:
             found = {i: colmap[_norm(c)] for i, c in enumerate(row) if _norm(c) in colmap}
             if "booking_id" in found.values() and len(found) >= 3:
