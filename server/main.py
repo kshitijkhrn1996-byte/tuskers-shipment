@@ -9,10 +9,13 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from . import db
-from .agent import empty_draft, missing_fields, run_turn
+from .agent import run_turn
 from .carriers import CARRIERS
+from .draft import apply_patch, draft_from_booking, empty_draft, missing_fields, missing_invoice_fields, try_build
 from .evaluate import evaluate
 from .excel import parse_workbook
+from .invoice import build_invoice
+from .live_checks import live_issues
 
 app = FastAPI(title="Tuskers Shipment Booking")
 
@@ -37,6 +40,21 @@ def _booking_row(report: dict, source: str, status: str, **extra) -> dict:
     }
 
 
+def snapshot(draft: dict) -> dict:
+    """Everything the UI needs to show the current state of a draft."""
+    today = today_uk()
+    booking, build_error = try_build(draft)
+    report = evaluate(booking, today) if booking else None
+    return {
+        "draft": draft,
+        "missing": missing_fields(draft),
+        "issues": [i.model_dump() for i in live_issues(draft, today)],
+        "build_error": build_error,
+        "report": report.model_dump(mode="json") if report else None,
+        "invoice_missing": missing_invoice_fields(draft),
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "today": today_uk().isoformat(), "gemini": bool(os.environ.get("GEMINI_API_KEY"))}
@@ -45,6 +63,24 @@ def health():
 @app.get("/api/carriers")
 def carriers():
     return [c.model_dump(mode="json") | {"label": c.label} for c in CARRIERS]
+
+
+def _load_or_create(conversation_id: Optional[str], prefix: str = "CHAT") -> dict:
+    if conversation_id:
+        conv = db.get_one("ts_conversations", id=conversation_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        return conv
+    conv = db.insert("ts_conversations", {"draft": empty_draft(), "history": []})[0]
+    conv["draft"]["booking_id"] = f"{prefix}-" + conv["id"][:6].upper()
+    return conv
+
+
+def _save(conv_id: str, draft: dict, report: Optional[dict], history: Optional[list] = None):
+    values = {"draft": draft, "report": report, "updated_at": datetime.utcnow().isoformat()}
+    if history is not None:
+        values["history"] = history
+    db.update("ts_conversations", {"id": conv_id}, values)
 
 
 # ---------- Part 1: conversation ----------
@@ -56,42 +92,79 @@ class ChatIn(BaseModel):
 
 @app.post("/api/chat")
 def chat(body: ChatIn):
-    if body.conversation_id:
-        conv = db.get_one("ts_conversations", id=body.conversation_id)
-        if not conv:
-            raise HTTPException(404, "Conversation not found")
-    else:
-        draft = empty_draft()
-        conv = db.insert("ts_conversations", {"draft": draft, "history": []})[0]
-        conv["draft"]["booking_id"] = "CHAT-" + conv["id"][:6].upper()
+    conv = _load_or_create(body.conversation_id)
     draft, history = conv["draft"], conv["history"]
 
     try:
         out = run_turn(draft, history, body.message, today_uk())
     except Exception as e:  # Gemini/network failure: keep the conversation alive
         return {"conversation_id": conv["id"], "reply": f"Sorry, I couldn't read that just now ({type(e).__name__}). "
-                "Please try sending it again.", "draft": draft, "missing": missing_fields(draft),
-                "report": conv.get("report"), "confirmed": None}
+                "Please try sending it again.", "new_issues": [], "input_errors": [], "confirmed": None,
+                **snapshot(draft)}
 
     draft = out["draft"]
-    report = out.get("report")
+    snap = snapshot(draft)
     history = history + [{"role": "user", "content": body.message}, {"role": "assistant", "content": out["reply"]}]
     reply, confirmed = out["reply"], None
-    if out.get("confirm_requested") and report:
-        if report["blocked"]:
-            reply = "I can't confirm yet — there are red issues to fix first. " + reply
+    if out.get("confirm_requested"):
+        if not snap["report"]:
+            reply = "I can't confirm yet — the booking isn't complete. " + reply
+        elif snap["report"]["blocked"]:
+            reply = "I can't confirm yet — there are red problems to fix first. " + reply
         else:
-            confirmed = _confirm(report, conv["id"])
+            confirmed = _confirm(snap["report"], conv["id"], "chat")
             reply = _confirmed_text(confirmed)
             history[-1]["content"] = reply
-    db.update("ts_conversations", {"id": conv["id"]},
-              {"draft": draft, "history": history, "report": report, "updated_at": datetime.utcnow().isoformat()})
-    return {"conversation_id": conv["id"], "reply": reply, "draft": draft, "missing": out.get("missing", []),
-            "report": report, "confirmed": confirmed}
+    _save(conv["id"], draft, snap["report"], history)
+    return {"conversation_id": conv["id"], "reply": reply, "new_issues": out.get("new_issues", []),
+            "input_errors": out.get("input_errors", []), "confirmed": confirmed, **snap}
 
 
-def _confirm(report: dict, conversation_id: Optional[str] = None) -> dict:
-    return db.insert("ts_bookings", _booking_row(report, "chat", "confirmed", conversation_id=conversation_id))[0]
+# ---------- Form: edit the draft directly ----------
+
+class DraftIn(BaseModel):
+    conversation_id: Optional[str] = None
+    draft: dict
+
+
+@app.post("/api/draft")
+def update_draft(body: DraftIn):
+    conv = _load_or_create(body.conversation_id, "FORM")
+    base = conv["draft"]
+    patch = {"booking": body.draft.get("booking") or {}, "items": body.draft.get("items") or [],
+             "invoice": body.draft.get("invoice") or {}, "unknown": body.draft.get("unknown") or []}
+    draft, errors, _ = apply_patch(base, patch, replace=True)
+    snap = snapshot(draft)
+    _save(conv["id"], draft, snap["report"])
+    return {"conversation_id": conv["id"], "input_errors": errors, **snap}
+
+
+@app.get("/api/bookings/{reference}/draft")
+def booking_as_draft(reference: str):
+    row = db.get_one("ts_bookings", reference=reference)
+    if not row:
+        raise HTTPException(404, "Booking not found")
+    return {"draft": draft_from_booking(row["booking"])}
+
+
+class InvoiceIn(BaseModel):
+    conversation_id: str
+
+
+@app.post("/api/invoice")
+def invoice(body: InvoiceIn):
+    conv = db.get_one("ts_conversations", id=body.conversation_id)
+    if not conv:
+        raise HTTPException(404, "Conversation not found")
+    booking, err = try_build(conv["draft"])
+    if not booking:
+        raise HTTPException(400, err or "Complete the booking first")
+    report = evaluate(booking, today_uk())
+    return build_invoice(report, conv["draft"].get("invoice") or {}, today_uk())
+
+
+def _confirm(report: dict, conversation_id: Optional[str], source: str) -> dict:
+    return db.insert("ts_bookings", _booking_row(report, source, "confirmed", conversation_id=conversation_id))[0]
 
 
 def _confirmed_text(row: dict) -> str:
@@ -101,6 +174,7 @@ def _confirmed_text(row: dict) -> str:
 
 class ConfirmIn(BaseModel):
     conversation_id: str
+    source: str = "chat"
 
 
 @app.post("/api/chat/confirm")
@@ -110,7 +184,7 @@ def chat_confirm(body: ConfirmIn):
         raise HTTPException(400, "Booking is not complete yet")
     if conv["report"]["blocked"]:
         raise HTTPException(400, "Fix the red issues before confirming")
-    row = _confirm(conv["report"], conv["id"])
+    row = _confirm(conv["report"], conv["id"], body.source if body.source in ("chat", "form") else "chat")
     return {"reference": row["reference"], "message": _confirmed_text(row)}
 
 

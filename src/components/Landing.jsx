@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, gbp } from '../api.js'
+import { api, gbp0 as gbp } from '../api.js'
 import RouteMap, { DESTINATIONS, ORIGINS } from './RouteMap.jsx'
 
 const STEPS = [

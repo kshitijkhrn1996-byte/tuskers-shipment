@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { gbp } from '../api.js'
+import { gbp0 as gbp } from '../api.js'
 
 const DOT = { pass: 'bg-emerald-500', fail_Red: 'bg-red-500', fail_Amber: 'bg-amber-400', pending: 'bg-slate-300' }
 
-export default function ReportPanel({ report, confirmed, onConfirm }) {
+export default function ReportPanel({ report, confirmed, onConfirm, onInvoice, showFailures = true }) {
   const { booking, checks, blocked, red_count, amber_count, recommendation, confirmation, next_steps } = report
   const fails = checks.filter((c) => c.status === 'fail')
   const status = blocked
@@ -28,7 +28,7 @@ export default function ReportPanel({ report, confirmed, onConfirm }) {
 
       <div className="card">
         <h3 className="px-4 pt-3 pb-2 text-sm font-semibold">Pre-flight checks</h3>
-        {fails.length > 0 && (
+        {showFailures && fails.length > 0 && (
           <div className="px-4 pb-3 space-y-2">
             {fails.map((c) => (
               <div key={c.rule_id} className={`rounded-lg border-l-4 px-3 py-2 text-sm ${c.severity === 'Red' ? 'border-red-500 bg-red-50' : 'border-amber-400 bg-amber-50'}`}>
@@ -69,6 +69,12 @@ export default function ReportPanel({ report, confirmed, onConfirm }) {
         {confirmed
           ? <div className="rounded-lg bg-brand-light text-brand-dark px-3 py-2 text-sm font-semibold">Booked ✓ Reference {confirmed.reference}</div>
           : <ConfirmButton blocked={blocked} onConfirm={onConfirm} />}
+        {onInvoice && (
+          <button className="btn-ghost w-full" onClick={onInvoice}>
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 2.5h7l3 3v12H5z M12 2.5v3h3 M7.5 9h5 M7.5 12h5 M7.5 15h3" strokeLinejoin="round" /></svg>
+            Commercial invoice
+          </button>
+        )}
       </div>
     </div>
   )

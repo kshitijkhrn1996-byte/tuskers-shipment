@@ -14,3 +14,9 @@
 @keyframes route-dash { to { stroke-dashoffset: -15; } }
 .city-pulse { transform-box: fill-box; transform-origin: center; animation: city-pulse 2s ease-out infinite; }
 @keyframes city-pulse { 0% { transform: scale(0.8); opacity: 0.35; } 100% { transform: scale(2); opacity: 0; } }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+}

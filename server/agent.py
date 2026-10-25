@@ -1,71 +1,59 @@
 """Conversational booking agent (LangGraph).
 
-Graph: extract -> normalise -> (ask | evaluate)
+Graph: understand -> apply -> (answer) -> respond
 
-- extract:   Gemini turns the seller's message into a JSON patch on the draft.
-             It never answers questions or invents values.
-- normalise: deterministic. Rejects values outside the allowed lists, fills
-             safe derivations (country from city, cartons from units), and
-             works out which required fields are still missing.
-- ask:       deterministic question for the next group of missing fields.
-- evaluate:  builds the Booking, runs the rulebook + carrier recommender.
+- understand: Gemini reads the message in context and returns what the
+              seller wants (give details, ask a question, confirm, get an
+              invoice) plus a JSON patch of any details. It never invents values.
+- apply:      deterministic. Validates against the allowed lists, derives
+              safe totals, diffs the draft, runs live checks on partial data.
+- answer_question: only for questions: a short plain-English answer (Gemini).
+- respond:    deterministic reply: what changed, problems spotted right now
+              (red/amber), the answer, then either the next missing details
+              or the full pre-flight result.
 
-Every turn re-runs the whole graph on the updated draft, so a mid-chat
-change ("add a pallet") always re-runs the checks and carrier choice.
+Every turn re-runs the checks on the whole draft, so a mid-chat change
+("add a pallet") immediately updates the flags, carrier and price.
 """
 import json
 import os
 from datetime import date
-from typing import Any, Optional, TypedDict
+from typing import Optional, TypedDict
 
 from langgraph.graph import END, StateGraph
-from pydantic import ValidationError
 
+from .draft import (BOOKING_FIELDS, DEST_CITIES, GROUPS, INCOTERMS, ITEM_FIELDS, ITEM_ORIGINS, LABELS, ORIGIN_CITIES,
+                    apply_patch, empty_draft, missing_fields, missing_invoice_fields, try_build)
 from .evaluate import evaluate
-from .schemas import (DESTINATION_CITIES, Booking, DestinationType, ItemOrigin, OriginCity,
-                      Priority)
+from .invoice import invoice_question
+from .live_checks import live_issues
 
-CITY_TO_COUNTRY = {city: country.value for country, cities in DESTINATION_CITIES.items() for city in cities}
-ORIGIN_CITIES = [c.value for c in OriginCity]
-ITEM_ORIGINS = [c.value for c in ItemOrigin]
-PRIORITIES = [p.value for p in Priority]
-DEST_TYPES = [d.value for d in DestinationType]
+__all__ = ["empty_draft", "run_turn", "missing_fields"]
 
-BOOKING_FIELDS = ["seller_name", "origin_city", "destination_city", "destination_country",
-                  "destination_type", "ready_to_ship_date", "seller_priority", "pallets", "cartons",
-                  "total_declared_value", "total_gross_weight_kg", "delivery_appointment_booked"]
-ITEM_FIELDS = ["sku", "description", "hs_code", "quantity", "unit_price", "units_per_carton",
-               "cartons", "unit_weight_kg", "country_of_origin"]
-# Allowed blank in Sheet 2; we ask once, and "don't know" leaves them blank for R-01/R-09 to flag.
-OPTIONAL_ITEM_FIELDS = {"hs_code", "country_of_origin"}
-
-LABELS = {
+ASK = {
     "seller_name": "your business name",
-    "origin_city": f"the collection city ({', '.join(ORIGIN_CITIES)})",
-    "destination_city": "the delivery city (Berlin, Frankfurt, Hamburg, Paris, Lyon, Amsterdam or Rotterdam)",
+    "origin_city": f"where we collect from ({', '.join(ORIGIN_CITIES)})",
+    "destination_city": f"the delivery city ({', '.join(DEST_CITIES)})",
     "destination_type": "whether it's going to a warehouse or a business address",
     "ready_to_ship_date": "the date the goods will be packed and ready for collection",
-    "seller_priority": "what matters most: cheapest, fastest, most reliable, or balanced",
+    "seller_priority": "what matters most: cheapest, fastest, most reliable, or a balance",
     "pallets": "how many pallets",
     "total_gross_weight_kg": "the total gross weight in kg (goods + cartons + pallets)",
-    "delivery_appointment_booked": "whether you have a delivery appointment booked at the warehouse",
+    "delivery_appointment_booked": "whether you've booked a delivery appointment at the warehouse",
     "description": "what the product is",
     "quantity": "how many units",
-    "unit_price": "the price per unit in GBP",
+    "unit_price": "the price per unit (GBP)",
     "units_per_carton": "how many units go in each carton",
     "cartons": "how many cartons",
     "unit_weight_kg": "the weight of one unit in kg",
-    "hs_code": "the HS code (6+ digits; say 'don't know' if you don't have it)",
+    "hs_code": "the HS code (6+ digits, or say you don't know)",
     "country_of_origin": f"where it was made ({', '.join(ITEM_ORIGINS)})",
 }
-
-GROUPS = [
-    ["seller_name"],
-    ["origin_city", "destination_city", "destination_type"],
-    "items",
-    ["pallets", "total_gross_weight_kg"],
-    ["ready_to_ship_date", "delivery_appointment_booked", "seller_priority"],
-]
+GROUP_INTRO = {
+    "origin_city": "Now the route.",
+    "pallets": "Next, how it's packed.",
+    "ready_to_ship_date": "Nearly done.",
+}
 
 
 class AgentState(TypedDict, total=False):
@@ -73,274 +61,272 @@ class AgentState(TypedDict, total=False):
     history: list[dict]
     user_message: str
     today: str
-    patch: dict
+    understood: dict
+    old_draft: dict
+    input_errors: list[dict]
     notes: list[str]
+    issues: list[dict]
+    new_issues: list[dict]
+    resolved: list[str]
     missing: list[str]
+    answer: Optional[str]
     reply: str
     report: Optional[dict]
     confirm_requested: bool
 
 
-def empty_draft() -> dict:
-    return {"booking": {"origin_country": "United Kingdom", "currency": "GBP"},
-            "items": [], "unknown": [], "derived": []}
+# ---------- understand (Gemini) ----------
 
+UNDERSTAND_PROMPT = """You are the language-understanding step of a UK→EU pallet shipment booking assistant.
+Read the seller's latest message in context and return ONLY JSON.
 
-# ---------- extract (Gemini) ----------
-
-EXTRACT_PROMPT = """You extract shipment booking data from a seller's chat message.
-Return ONLY JSON. Never invent values the seller did not give, and never calculate missing
-values yourself (e.g. do not work out cartons from units). Never answer questions.
-
-Today is {today}. Current draft (null = not yet known):
+Today is {today}. Current booking draft (null = not known yet):
 {draft}
 
-Last question we asked the seller: {last_question}
+Recent conversation:
+{history}
+
 Seller's new message: {message}
 
-Return:
+Return exactly:
 {{
-  "booking": {{ only fields the seller stated or changed in THIS message, from:
-     seller_name (text), origin_city, destination_city, destination_type ("Warehouse" or "Business address"),
-     ready_to_ship_date ("DD-MM-YYYY"; resolve relative dates like "next Friday" using today),
-     seller_priority ("Cheapest"|"Fastest"|"Most reliable"|"Balanced"),
-     pallets (int), cartons (int, booking total), total_declared_value (number, GBP),
+  "intent": one of "details" (gives or changes booking/invoice details), "question" (asks something),
+            "confirm" (clearly approves/confirms the booking), "invoice" (wants a commercial invoice),
+            "other" (greeting, thanks, unclear). A message can give details AND ask a question: use "question"
+            and still fill the patch.,
+  "question": the seller's question rewritten as a standalone question, or null,
+  "booking": {{ only fields stated or changed in THIS message:
+     seller_name, origin_city, destination_city, destination_country,
+     destination_type ("Warehouse" | "Business address"),
+     ready_to_ship_date ("DD-MM-YYYY"; resolve "next Friday", "5th Nov" etc. using today; with no year given use the current year, even if that date has passed),
+     seller_priority ("Cheapest" | "Fastest" | "Most reliable" | "Balanced"),
+     pallets (int), cartons (int — ONLY if the seller states a total for the whole shipment; per-product cartons go on the product),
+     total_declared_value (number, GBP),
      total_gross_weight_kg (number), delivery_appointment_booked (true/false) }},
-  "items": null if no item changed, otherwise the FULL updated list of items (keep every existing
-     item and its values, apply additions/edits/removals). Item fields: sku, description, hs_code (string of digits),
-     quantity (int), unit_price (number), units_per_carton (int), cartons (int), unit_weight_kg (number),
-     country_of_origin. Use null for anything unknown.,
-  "unknown": list of fields the seller says they do not know, as "items.<index>.hs_code" or
-     "items.<index>.country_of_origin",
-  "confirm": true only if the seller is clearly confirming/approving the booking
+  "items": null if no product changed, else the FULL updated product list (keep existing products and values,
+     apply additions, edits, removals). Product fields: sku, description, hs_code (digits as string),
+     quantity, unit_price, units_per_carton, cartons, unit_weight_kg, country_of_origin. null if unknown.,
+  "unknown": fields the seller says they don't know, as "items.<i>.hs_code" / "items.<i>.country_of_origin",
+  "invoice": {{ only invoice details stated: seller_address, seller_contact, seller_eori, buyer_name,
+     buyer_address, buyer_contact, consignee_name, consignee_address, related_docs (PO/contract no.),
+     payment_terms, incoterms (one of {incoterms}), reason_for_export }}
 }}
 
 Rules:
-- Relative changes apply to the draft: "add a pallet" with pallets=3 -> pallets 4; "one more carton of mugs" updates that item.
-- Convert units: grams -> kg, tonnes -> kg. Prices in pence -> pounds.
-- Copy city/country names as the seller wrote them (we validate them ourselves).
-- If the answer is a bare value, map it to the last question we asked.
+- Never invent or calculate values the seller did not give (don't work out cartons, totals or weights).
+- Copy place names exactly as written, even if they look wrong (we validate them).
+- Relative changes apply to the draft: "add a pallet" with pallets=3 → 4; "make it 100 more mugs" → quantity + 100.
+- A bare answer ("Leeds", "yes", "12") answers the last question the assistant asked.
+- Units: grams→kg, tonnes→kg, pence→pounds. "half a kilo" = 0.5.
+- "same as before"/"no change" → no patch.
+- A business introducing itself ("Gadget Lane here", "this is Northfield Goods") sets seller_name. Only fill invoice
+  addresses when the seller clearly gives a street address for invoicing.
 """
 
 
-def _gemini_json(prompt: str) -> dict:
+def _gemini(prompt: str, json_mode: bool = True, system: Optional[str] = None) -> str:
     from google import genai
     from google.genai import types
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    resp = client.models.generate_content(
-        model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
-        contents=prompt,
-        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0),
-    )
-    return json.loads(resp.text)
+    config = types.GenerateContentConfig(temperature=0 if json_mode else 0.3, system_instruction=system,
+                                         response_mime_type="application/json" if json_mode else None)
+    resp = client.models.generate_content(model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+                                          contents=prompt, config=config)
+    return resp.text
 
 
-def extract(state: AgentState) -> AgentState:
-    last_q = next((m["content"] for m in reversed(state.get("history", [])) if m["role"] == "assistant"), "none")
-    prompt = EXTRACT_PROMPT.format(today=state["today"], draft=json.dumps(state["draft"], default=str),
-                                   last_question=last_q, message=state["user_message"])
-    return {"patch": _gemini_json(prompt)}
+def understand(state: AgentState) -> AgentState:
+    view = {k: v for k, v in state["draft"].items() if k in ("booking", "items", "invoice")}
+    hist = "\n".join(f"{m['role']}: {m['content'][:400]}" for m in state.get("history", [])[-6:]) or "(none)"
+    prompt = UNDERSTAND_PROMPT.format(today=state["today"], draft=json.dumps(view, default=str), history=hist,
+                                      message=state["user_message"], incoterms=", ".join(INCOTERMS))
+    return {"understood": json.loads(_gemini(prompt))}
 
 
-# ---------- normalise (deterministic) ----------
+# ---------- apply (deterministic) ----------
 
-def _match(value: Any, options: list[str]) -> Optional[str]:
-    if value is None:
-        return None
-    s = str(value).strip().lower()
-    for o in options:
-        if s == o.lower():
-            return o
-    aliases = {"uk": "United Kingdom", "england": "United Kingdom", "britain": "United Kingdom",
-               "great britain": "United Kingdom", "holland": "Netherlands", "the netherlands": "Netherlands",
-               "business": "Business address", "office": "Business address", "shop": "Business address",
-               "reliable": "Most reliable", "cheap": "Cheapest", "fast": "Fastest", "quickest": "Fastest"}
-    a = aliases.get(s)
-    return a if a in options else None
+def _fmt(field: str, v) -> str:
+    if v is None:
+        return "—"
+    if field in ("total_declared_value", "unit_price"):
+        return f"£{v:,.2f}"
+    if field in ("total_gross_weight_kg", "unit_weight_kg"):
+        return f"{v:g} kg"
+    if field == "delivery_appointment_booked":
+        return "booked" if v else "not booked"
+    return str(v)
 
 
-def normalise(state: AgentState) -> AgentState:
-    draft = json.loads(json.dumps(state["draft"]))
-    patch = state.get("patch") or {}
-    notes: list[str] = []
-    b = draft["booking"]
+ITEM_LABELS = {"description": "now", "hs_code": "HS", "quantity": "qty", "unit_price": "price",
+               "units_per_carton": "per carton", "cartons": "cartons", "unit_weight_kg": "unit weight",
+               "country_of_origin": "made in"}
 
-    for field, value in (patch.get("booking") or {}).items():
-        if field not in BOOKING_FIELDS or value is None:
+
+def describe_changes(old: dict, new: dict) -> list[str]:
+    out = []
+    for f in BOOKING_FIELDS:
+        if f == "destination_country":
             continue
-        if field == "origin_city":
-            m = _match(value, ORIGIN_CITIES)
-            if not m:
-                notes.append(f"Sorry, we only collect from {', '.join(ORIGIN_CITIES)} — not “{value}”.")
+        o, n = old["booking"].get(f), new["booking"].get(f)
+        if n is not None and o != n and f not in new.get("derived", []):
+            out.append(f"{LABELS[f].lower()} {_fmt(f, o)} → {_fmt(f, n)}" if o is not None else f"{LABELS[f].lower()} {_fmt(f, n)}")
+    old_items, new_items = old["items"], new["items"]
+    for i, it in enumerate(new_items):
+        name = it.get("description") or it.get("sku")
+        prev = old_items[i] if i < len(old_items) else None
+        prev_name = (prev or {}).get("description") or ""
+        swapped = prev and prev_name and name and prev_name.lower() not in name.lower() and name.lower() not in prev_name.lower()
+        if prev is None or swapped:
+            head = f"{it['quantity']} {name}" if it.get("quantity") is not None else name
+            if it.get("unit_price") is not None:
+                head += f" at £{it['unit_price']:,.2f}"
+            out.append(f"replaced {prev_name} with {head}" if swapped else f"added {head}")
+            continue
+        changed = []
+        for f in ITEM_FIELDS:
+            if f in ("sku",) or it.get(f) is None or it.get(f) == prev.get(f):
                 continue
-            value = m
-        elif field == "destination_city":
-            m = _match(value, list(CITY_TO_COUNTRY))
-            if not m:
-                notes.append(f"Sorry, “{value}” isn't a delivery city we serve. "
-                             "Choose Berlin, Frankfurt, Hamburg, Paris, Lyon, Amsterdam or Rotterdam.")
-                continue
-            value = m
-            b["destination_country"] = CITY_TO_COUNTRY[m]
-        elif field == "destination_country":
-            m = _match(value, ["Germany", "France", "Netherlands"])
-            if not m:
-                notes.append(f"Sorry, we only ship to Germany, France and the Netherlands — not “{value}”.")
-                continue
-            if b.get("destination_city") and CITY_TO_COUNTRY.get(b["destination_city"]) != m:
-                b.pop("destination_city")
-            value = m
-        elif field == "destination_type":
-            value = _match(value, DEST_TYPES)
-            if not value:
-                continue
-        elif field == "seller_priority":
-            value = _match(value, PRIORITIES)
-            if not value:
-                notes.append("Please pick a priority: cheapest, fastest, most reliable or balanced.")
-                continue
-        elif field in ("pallets", "cartons"):
-            try:
-                value = int(value)
-            except (TypeError, ValueError):
-                continue
-            if field == "pallets" and value < 1:
-                notes.append("A shipment needs at least one pallet.")
-                continue
-        b[field] = value
-        if field in ("cartons", "total_declared_value"):
-            draft["derived"] = [d for d in draft["derived"] if d != field]
-
-    if patch.get("items") is not None:
-        new_items = []
-        for i, it in enumerate(patch["items"]):
-            it = {k: it.get(k) for k in ITEM_FIELDS}
-            if it.get("country_of_origin") is not None:
-                m = _match(it["country_of_origin"], ITEM_ORIGINS)
-                if not m:
-                    notes.append(f"“{it['country_of_origin']}” isn't an accepted country of origin; "
-                                 f"choose {', '.join(ITEM_ORIGINS)}.")
-                it["country_of_origin"] = m
-            if it.get("hs_code") is not None:
-                it["hs_code"] = str(it["hs_code"]).replace(".", "").replace(" ", "")
-            new_items.append(it)
-        draft["items"] = new_items
-    draft["unknown"] = sorted(set(draft.get("unknown", [])) | set(patch.get("unknown") or []))
-
-    # Safe derivations, each announced so the seller can correct them.
-    for idx, it in enumerate(draft["items"]):
-        if not it.get("sku"):
-            it["sku"] = f"ITEM-{idx + 1}"
-        q, upc = it.get("quantity"), it.get("units_per_carton")
-        if it.get("cartons") is None and q and upc and q % upc == 0:
-            it["cartons"] = q // upc
-            notes.append(f"Worked out {it['cartons']} cartons of {it.get('description') or it['sku']} "
-                         f"({q} units ÷ {upc} per carton).")
-    if b.get("destination_type") == "Business address" and b.get("delivery_appointment_booked") is None:
-        b["delivery_appointment_booked"] = False
-    items_complete = draft["items"] and all(it.get(f) is not None for it in draft["items"]
-                                            for f in ("quantity", "unit_price", "cartons"))
-    if items_complete:
-        if b.get("cartons") is None or "cartons" in draft["derived"]:
-            b["cartons"] = sum(it["cartons"] for it in draft["items"])
-            if "cartons" not in draft["derived"]:
-                draft["derived"].append("cartons")
-        if b.get("total_declared_value") is None or "total_declared_value" in draft["derived"]:
-            b["total_declared_value"] = round(sum(it["quantity"] * it["unit_price"] for it in draft["items"]), 2)
-            if "total_declared_value" not in draft["derived"]:
-                draft["derived"].append("total_declared_value")
-
-    return {"draft": draft, "notes": notes, "missing": missing_fields(draft),
-            "confirm_requested": bool(patch.get("confirm"))}
+            label = ITEM_LABELS[f]
+            changed.append(f"{label} {_fmt(f, prev[f])} → {_fmt(f, it[f])}" if prev.get(f) is not None
+                           else f"{label} {_fmt(f, it[f])}")
+        if changed:
+            out.append(f"{name}: {', '.join(changed)}")
+    for it in old_items[len(new_items):]:
+        out.append(f"removed {it.get('description') or it.get('sku')}")
+    for f, v in (new.get("invoice") or {}).items():
+        if (old.get("invoice") or {}).get(f) != v:
+            out.append(f"{LABELS[f].lower()}: {v}")
+    return out
 
 
-def missing_fields(draft: dict) -> list[str]:
-    b, missing = draft["booking"], []
-    for group in GROUPS:
-        if group == "items":
-            if not draft["items"]:
-                missing.append("items")
-            for i, it in enumerate(draft["items"]):
-                for f in ITEM_FIELDS:
-                    if it.get(f) is None and not (f in OPTIONAL_ITEM_FIELDS and f"items.{i}.{f}" in draft["unknown"]):
-                        missing.append(f"items.{i}.{f}")
-        else:
-            missing += [f for f in group if b.get(f) is None]
-    return missing
+def apply(state: AgentState) -> AgentState:
+    u = state.get("understood") or {}
+    old = state["draft"]
+    draft, errors, notes = apply_patch(old, {"booking": u.get("booking"), "items": u.get("items"),
+                                             "unknown": u.get("unknown"), "invoice": u.get("invoice")})
+    if u.get("intent") == "invoice":
+        draft["invoice_requested"] = True
+    issues = [i.model_dump() for i in live_issues(draft, date.fromisoformat(state["today"]))]
+    seen = set(old.get("issue_keys", []))
+    new_issues = [i for i in issues if i["key"] not in seen and i["severity"] != "Info"]
+    now = {i["key"] for i in issues}
+    resolved = [k for k in seen if k not in now and not k.endswith("-info")]
+    draft["issue_keys"] = [i["key"] for i in issues]
+    return {"draft": draft, "old_draft": old, "input_errors": errors, "notes": notes, "issues": issues,
+            "new_issues": new_issues, "resolved": resolved, "missing": missing_fields(draft),
+            "confirm_requested": u.get("intent") == "confirm"}
 
 
-# ---------- ask / evaluate ----------
+# ---------- answer (Gemini, questions only) ----------
+
+ANSWER_SYSTEM = """You answer a small UK seller's question inside a pallet booking chat (UK → Germany,
+France, Netherlands by road). Be accurate and brief: 2–4 sentences, plain English, no headings.
+You may use the booking draft for context. Never make up prices, rules or legal advice; for HS codes
+point to the UK Trade Tariff (gov.uk/trade-tariff). If the question is off-topic, say you can only help
+with shipping and this booking."""
+
+
+def answer(state: AgentState) -> AgentState:
+    q = state["understood"].get("question") or state["user_message"]
+    view = {k: state["draft"][k] for k in ("booking", "items")}
+    try:
+        text = _gemini(f"Booking draft: {json.dumps(view, default=str)}\n\nQuestion: {q}", json_mode=False,
+                       system=ANSWER_SYSTEM).strip()
+    except Exception:
+        text = "Sorry, I couldn't look that up just now — the Help button has explanations of common terms."
+    return {"answer": text}
+
+
+# ---------- respond (deterministic) ----------
 
 def _join(parts: list[str]) -> str:
     return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
-def ask(state: AgentState) -> AgentState:
-    missing, draft = state["missing"], state["draft"]
+def next_question(draft: dict, missing: list[str]) -> str:
     first = missing[0]
     if first == "items":
-        q = ("What are you shipping? For each product tell me what it is, how many units, the price per unit (GBP), "
-             "units per carton, and the weight of one unit. HS code and country of origin help too.")
-    elif first.startswith("items."):
+        return ("What are you sending? For each product: what it is, how many units, price per unit, "
+                "units per carton and the weight of one unit. HS code and country of origin too, if you have them.")
+    if first.startswith("items."):
         idx = int(first.split(".")[1])
         fields = [m.split(".")[2] for m in missing if m.startswith(f"items.{idx}.")]
-        name = draft["items"][idx].get("description") or f"item {idx + 1}"
-        q = f"For {name}, I still need {_join([LABELS[f] for f in fields])}."
+        name = draft["items"][idx].get("description") or f"product {idx + 1}"
+        return f"For the {name}, I still need {_join([ASK[f] for f in fields])}."
+    group = next(g for g in GROUPS if g != "items" and first in g)
+    wanted = [ASK[f] for f in group if f in missing]
+    intro = GROUP_INTRO.get(group[0], "")
+    return f"{intro} Could you tell me {_join(wanted)}?".strip()
+
+
+def respond(state: AgentState) -> AgentState:
+    draft, u = state["draft"], state.get("understood") or {}
+    lines: list[str] = []
+    changes = describe_changes(state["old_draft"], draft)
+    if changes:
+        lines.append("Got it — " + "; ".join(changes) + ".")
+    lines += state.get("notes", [])
+    if state.get("answer"):
+        lines.append(state["answer"])
+    if not changes and not state.get("answer") and not state.get("input_errors") and u.get("intent") in ("other", "details", None):
+        lines.append("I didn't pick up any booking details there." if u.get("intent") == "details" else "Happy to help.")
+    if state.get("resolved"):
+        lines.append(f"✓ That clears {len(state['resolved'])} earlier problem(s).")
+    for e in state.get("input_errors", []):
+        lines.append("✗ " + e["message"])
+    if state["new_issues"]:
+        reds = sum(i["severity"] == "Red" for i in state["new_issues"])
+        lines.append(f"I've flagged {len(state['new_issues'])} problem(s) with what you've told me"
+                     + (f" — {reds} would stop the shipment." if reds else ".") + " Details below.")
+
+    report = None
+    if state["missing"]:
+        lines.append(next_question(draft, state["missing"]))
     else:
-        group = next(g for g in GROUPS if g != "items" and first in g)
-        q = f"Could you tell me {_join([LABELS[f] for f in group if f in missing])}?"
-    return {"reply": "\n".join(state.get("notes", []) + [q]), "report": None}
+        booking, err = try_build(draft)
+        if err:
+            lines.append(f"Something doesn't add up: {err}. Could you correct it?")
+        else:
+            rep = evaluate(booking, date.fromisoformat(state["today"]))
+            report = rep.model_dump(mode="json")
+            derived = [f"{booking.cartons} cartons" if f == "cartons" else f"a declared value of £{booking.total_declared_value:,.2f}"
+                       for f in draft.get("derived", [])]
+            if derived and not draft.get("derived_announced"):
+                draft["derived_announced"] = True
+                lines.append(f"From your products I've taken {_join(derived)} — tell me if your paperwork says otherwise.")
+            booking_changed = (state["old_draft"]["booking"], state["old_draft"]["items"]) != (draft["booking"], draft["items"])
+            if not state["old_draft"].get("report_shown") or booking_changed:
+                lines.append(rep.confirmation)
+            draft["report_shown"] = True
+            inv_missing = missing_invoice_fields(draft)
+            if rep.blocked:
+                lines.append("Tell me the corrected details and I'll re-check straight away.")
+            elif draft.get("invoice_requested") and inv_missing:
+                lines.append(invoice_question(inv_missing))
+            elif draft.get("invoice_requested"):
+                lines.append("Your commercial invoice is ready — open it from the panel on the right. "
+                             "Reply “confirm” to book.")
+            else:
+                lines.append("Reply “confirm” (or press Confirm) to book. I can also prepare the commercial invoice — just ask.")
+    return {"draft": draft, "reply": "\n".join(lines), "report": report}
 
 
-def build_booking(draft: dict, booking_id: str = "CHAT-DRAFT") -> Booking:
-    data = dict(draft["booking"])
-    data["booking_id"] = booking_id
-    data["items"] = [{**it, "booking_id": booking_id} for it in draft["items"]]
-    return Booking.model_validate(data)
-
-
-def evaluate_node(state: AgentState) -> AgentState:
-    draft = state["draft"]
-    try:
-        booking = build_booking(draft, draft.get("booking_id", "CHAT-DRAFT"))
-    except ValidationError as e:
-        msgs = "; ".join(f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in e.errors())
-        return {"reply": "\n".join(state.get("notes", []) + [f"Something doesn't look right: {msgs}. Could you correct it?"]),
-                "report": None}
-    report = evaluate(booking, date.fromisoformat(state["today"]))
-    derived = []
-    if "cartons" in draft["derived"]:
-        derived.append(f"{booking.cartons} cartons in total")
-    if "total_declared_value" in draft["derived"]:
-        derived.append(f"a declared value of £{booking.total_declared_value:,.2f}")
-    lines = list(state.get("notes", []))
-    if derived and not draft.get("derived_announced"):
-        draft["derived_announced"] = True
-        lines.append(f"From your items I've taken {_join(derived)} — tell me if your paperwork says otherwise.")
-    lines.append(report.confirmation)
-    if report.blocked:
-        lines.append("See the checks panel for what to fix. Tell me the corrected details and I'll re-check.")
-    else:
-        lines.append("Reply “confirm” or press Confirm booking to lock it in. You can still change any detail.")
-    return {"reply": "\n".join(lines), "report": report.model_dump(mode="json")}
-
-
-def _route(state: AgentState) -> str:
-    return "ask" if state["missing"] else "evaluate"
+def _after_apply(state: AgentState) -> str:
+    return "answer_question" if (state.get("understood") or {}).get("intent") == "question" else "respond"
 
 
 def build_graph():
     g = StateGraph(AgentState)
-    g.add_node("extract", extract)
-    g.add_node("normalise", normalise)
-    g.add_node("ask", ask)
-    g.add_node("evaluate", evaluate_node)
-    g.set_entry_point("extract")
-    g.add_edge("extract", "normalise")
-    g.add_conditional_edges("normalise", _route, {"ask": "ask", "evaluate": "evaluate"})
-    g.add_edge("ask", END)
-    g.add_edge("evaluate", END)
+    g.add_node("understand", understand)
+    g.add_node("apply", apply)
+    g.add_node("answer_question", answer)
+    g.add_node("respond", respond)
+    g.set_entry_point("understand")
+    g.add_edge("understand", "apply")
+    g.add_conditional_edges("apply", _after_apply, {"answer_question": "answer_question", "respond": "respond"})
+    g.add_edge("answer_question", "respond")
+    g.add_edge("respond", END)
     return g.compile()
 
 

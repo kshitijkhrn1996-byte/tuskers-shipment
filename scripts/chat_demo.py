@@ -1,11 +1,11 @@
 """Drive the agent through a scripted conversation (needs GEMINI_API_KEY)."""
+import os
 import sys
 from datetime import date
 from pathlib import Path
 
 for line in (Path(__file__).resolve().parent.parent / ".env").read_text().splitlines():
     if "=" in line:
-        import os
         k, v = line.split("=", 1)
         os.environ.setdefault(k, v)
 
@@ -20,12 +20,14 @@ turns = sys.argv[1:] or [
 ]
 draft, history = empty_draft(), []
 for msg in turns:
-    out = run_turn(draft, history, msg, date(2026, 10, 25))
+    out = run_turn(draft, history, msg, date(2026, 10, 26))
     draft = out["draft"]
     history += [{"role": "user", "content": msg}, {"role": "assistant", "content": out["reply"]}]
     print(f"\nSELLER: {msg}\nAGENT:  {out['reply']}")
+    for i in out.get("new_issues", []):
+        print(f"  [{i['severity']}] {i['message']}")
     if out.get("report"):
         r = out["report"]
         print("  -> fails:", [c["rule_id"] for c in r["checks"] if c["status"] == "fail"],
-              "| carrier:", r["recommendation"]["chosen"] and r["recommendation"]["chosen"]["option"]["service"],
-              "| pallets:", r["booking"]["pallets"])
+              "| carrier:", r["recommendation"]["chosen"] and r["recommendation"]["chosen"]["option"]["label"]
+              if False else "", "| pallets:", r["booking"]["pallets"])

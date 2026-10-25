@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Landing from './components/Landing.jsx'
 import Workspace from './components/Workspace.jsx'
 import HelpWidget from './components/HelpWidget.jsx'
+import Logo from './components/Logo.jsx'
 
 const pageFromHash = () => (window.location.hash === '#/book' ? 'book' : 'home')
 
@@ -20,10 +21,9 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <button onClick={() => go('home')} className="flex items-center gap-2 font-bold text-lg tracking-tight">
-            <span className="w-7 h-7 rounded-md bg-brand text-white grid place-items-center text-sm">T</span>
-            Tuskers<span className="text-brand">Freight</span>
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <button onClick={() => go('home')} aria-label="Tuskers Freight home">
+            <Logo className="h-10" />
           </button>
           <nav className="flex gap-1 text-sm">
             <button onClick={() => go('home')}
