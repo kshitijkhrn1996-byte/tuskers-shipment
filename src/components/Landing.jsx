@@ -21,19 +21,20 @@ export default function Landing({ go }) {
         </div>
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 pb-10 pt-10 lg:grid-cols-12 lg:pt-14">
           <motion.div className="lg:col-span-7" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}>
-            <button onClick={() => go('book')} className="group inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 backdrop-blur transition-shadow hover:shadow-lift">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-              {checked != null ? <>Consignments checked on Tuskers: <span className="font-mono text-ink">{checked}</span></> : 'Pre-flight checks for UK → EU road freight'}
-              <Arrow className="text-teal-600" />
-            </button>
-            <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-ink sm:text-5xl xl:text-6xl">
+            {checked != null && (
+              <button onClick={() => go('book')} className="group mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 backdrop-blur transition-shadow hover:shadow-lift">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                Consignments checked on Tuskers: <span className="font-mono text-ink">{checked}</span>
+                <Arrow className="text-teal-600" />
+              </button>
+            )}
+            <h1 className="text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-ink sm:text-5xl xl:text-6xl">
               Pre-flight checks for UK → EU freight.{' '}
               <span className="text-slate-400">Catch the customs and warehouse mistakes <span className="text-gradient">before your consignment leaves</span>, then book the right carrier.</span>
             </h1>
             <div className="mt-8 flex flex-wrap gap-3">
               <button className="btn-primary group px-5 py-2.5 text-base" onClick={() => go('book')}>Check a consignment <Arrow /></button>
             </div>
-            <p className="mt-5 text-sm text-slate-500">Chat, form or spreadsheet · Germany, France and the Netherlands · no login</p>
           </motion.div>
           <div className="lg:col-span-5"><HeroPreview /></div>
         </div>
@@ -78,10 +79,7 @@ export default function Landing({ go }) {
           </dl>
           <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-8">
             <p className="max-w-xl text-lg text-white/80">Mistakes caught at booking cost nothing. At customs, they cost days.</p>
-            <div className="flex gap-3">
-              <button className="btn group bg-white px-5 py-2.5 text-ink hover:-translate-y-px hover:shadow-lift" onClick={() => go('book')}>Check a consignment <Arrow /></button>
-              <a className="btn group border border-white/20 px-5 py-2.5 text-white hover:bg-white/10" href="/sample-shipments.xlsx" download>Sample sheet <Arrow /></a>
-            </div>
+            <a className="btn group border border-white/20 px-5 py-2.5 text-white hover:bg-white/10" href="/sample-shipments.xlsx" download>Download a sample sheet with planted mistakes <Arrow /></a>
           </div>
         </div>
       </section>
