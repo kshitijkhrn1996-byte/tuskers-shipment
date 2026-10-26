@@ -5,7 +5,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from .recommender import Recommendation, r05_carrier, recommend
-from .rulebook import RuleResult, Severity, Status, is_blocked, run_rulebook
+from .rulebook import RuleResult, Severity, Status, is_blocked, possible_dangerous, run_rulebook
 from .schemas import Booking
 
 
@@ -18,6 +18,7 @@ class Report(BaseModel):
     recommendation: Recommendation
     confirmation: str
     next_steps: list[str]
+    advisories: list[dict] = []  # "check this" notes outside the rulebook (never blocking)
 
 
 def evaluate(b: Booking, today: Optional[date] = None) -> Report:
@@ -56,6 +57,15 @@ def evaluate(b: Booking, today: Optional[date] = None) -> Report:
              else f"Delivery to {b.destination_city} in about {carrier.transit_days} day(s)."),
         ]
         next_steps[1:1] = [f"Before collection: {c.fix}" for c in ambers]
+    advisories = []
+    r06_failed = any(c.rule_id == "R-06" and c.status == Status.FAIL for c in checks)
+    for it in b.items:
+        why = None if r06_failed else possible_dangerous(f"{it.sku} {it.description}")
+        if why:
+            advisories.append({"message": f"{it.sku} ({it.description}) may be dangerous goods: {why}.",
+                               "fix": "Check the product's safety data sheet before booking."})
+    if rec.note:
+        advisories.append({"message": rec.note, "fix": None})
     return Report(booking=b, checks=checks, blocked=blocked, red_count=len(reds),
                   amber_count=len(ambers), recommendation=rec, confirmation=confirmation,
-                  next_steps=next_steps)
+                  next_steps=next_steps, advisories=advisories)

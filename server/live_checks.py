@@ -11,7 +11,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from .carriers import carriers_for
-from .rulebook import DANGEROUS_KEYWORDS, VALUE_TOLERANCE
+from .rulebook import VALUE_TOLERANCE, dangerous_category, possible_dangerous
 from .schemas import DestinationCountry
 
 
@@ -67,13 +67,16 @@ def live_issues(draft: dict, today: date) -> list[Issue]:
             add(f"S-upc:{i}", None, "Amber", f"items.{i}.units_per_carton",
                 f"{n}: {upc} per carton is more than the {q} units you're sending.")
 
-        text = f"{it.get('sku') or ''} {it.get('description') or ''}".lower()
-        for category, words in DANGEROUS_KEYWORDS.items():
-            if any(w in text for w in words):
-                add(f"R-06:{i}", "R-06", "Red", f"items.{i}.description",
-                    f"{n} looks like a {category}, which these road services can't carry.",
-                    "Remove it from this booking and ship it with a dangerous-goods specialist.")
-                break
+        text = f"{it.get('sku') or ''} {it.get('description') or ''}"
+        category = dangerous_category(text)
+        if category:
+            add(f"R-06:{i}", "R-06", "Red", f"items.{i}.description",
+                f"{n} looks like a {category}, which these road services can't carry.",
+                "Remove it from this booking and ship it with a dangerous-goods specialist.")
+        elif possible_dangerous(text):
+            add(f"S-dg:{i}", None, "Amber", f"items.{i}.description",
+                f"{n} may be dangerous goods: {possible_dangerous(text)}.",
+                "Check the product's safety data sheet before booking.")
 
         if it.get("country_of_origin") is None and f"items.{i}.country_of_origin" in unknown:
             add(f"R-09:{i}", "R-09", "Amber", f"items.{i}.country_of_origin",

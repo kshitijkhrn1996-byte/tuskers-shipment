@@ -37,3 +37,10 @@ def select(table: str, params: Optional[dict] = None) -> list[dict]:
 def get_one(table: str, **match) -> Optional[dict]:
     rows = select(table, {**{k: f"eq.{v}" for k, v in match.items()}, "limit": 1})
     return rows[0] if rows else None
+
+
+def count(table: str) -> int:
+    with _client() as c:
+        r = c.head(table, params={"select": "id"}, headers={"Prefer": "count=exact", "Range": "0-0"})
+        r.raise_for_status()
+        return int(r.headers.get("content-range", "*/0").split("/")[-1] or 0)

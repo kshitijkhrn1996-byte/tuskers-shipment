@@ -9,7 +9,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from .carriers import CarrierOption
+from .carriers import CarrierOption, carriers_for
 from .schemas import Booking, DestinationType
 
 
@@ -34,11 +34,40 @@ class RuleResult(BaseModel):
 
 
 DANGEROUS_KEYWORDS = {
-    "lithium battery": ["lithium", "li-ion", "li ion", "lipo", "li-po"],
-    "aerosol": ["aerosol", "spray can", "spray paint", "deodorant spray"],
-    "flammable liquid": ["flammable", "petrol", "gasoline", "lighter fluid", "lamp oil",
-                         "paint thinner", "acetone", "methylated spirit", "kerosene"],
+    "lithium battery": ["lithium", "li-ion", "li ion", "lipo", "li-po", "power bank", "powerbank",
+                        "18650", "e-cigarette", "e-cig", "vape"],
+    "aerosol": ["aerosol", "spray can", "spray paint", "deodorant spray", "spray deodorant", "body spray",
+                "hairspray", "hair spray", "air freshener spray", "dry shampoo"],
+    "flammable liquid": ["flammable", "petrol", "gasoline", "lighter fluid", "lamp oil", "paint thinner",
+                         "white spirit", "turpentine", "acetone", "nail polish", "nail varnish",
+                         "methylated spirit", "kerosene", "isopropyl", "ethanol", "hand sanitiser",
+                         "hand sanitizer"],
 }
+# Words that often mean dangerous goods but not always: flagged as "check", never blocking.
+POSSIBLE_DANGEROUS = {
+    "battery": "batteries — fine if alkaline, but lithium batteries can't go on these services",
+    "batteries": "batteries — fine if alkaline, but lithium batteries can't go on these services",
+    "spray": "a spray — if it's an aerosol can, it can't go on these services",
+    "perfume": "perfume — usually alcohol-based, which counts as a flammable liquid",
+    "eau de": "fragrance — usually alcohol-based, which counts as a flammable liquid",
+    "cologne": "cologne — usually alcohol-based, which counts as a flammable liquid",
+    "solvent": "a solvent — many are flammable liquids",
+    "varnish": "varnish — many are flammable liquids",
+}
+
+
+def dangerous_category(text: str) -> Optional[str]:
+    text = text.lower()
+    for category, words in DANGEROUS_KEYWORDS.items():
+        if any(w in text for w in words):
+            return category
+    return None
+
+
+def possible_dangerous(text: str) -> Optional[str]:
+    """Only meaningful when dangerous_category() found nothing."""
+    text = text.lower()
+    return next((why for word, why in POSSIBLE_DANGEROUS.items() if word in text), None)
 
 VALUE_TOLERANCE = 0.01
 
@@ -58,9 +87,13 @@ def r01_hs_code(b: Booking) -> RuleResult:
     if not bad:
         return _ok("R-01", t, s)
     detail = "; ".join(f"{i.sku}: {i.hs_code or 'blank'}" for i in bad)
-    return _fail("R-01", t, s, f"Missing or too-short HS code ({detail}).",
-                 "Look up each product's code (at least 6 digits) in the UK Trade Tariff "
-                 "and add it, otherwise customs can hold the shipment.")
+    fix = ("Look up each product's code (at least 6 digits) in the UK Trade Tariff "
+           "and add it, otherwise customs can hold the shipment.")
+    five = [i.hs_code for i in bad if i.hs_code and i.hs_code.isdigit() and len(i.hs_code) == 5]
+    if five:
+        fix += (f" If {five[0]} should start with 0 (chapters 01–09), the spreadsheet dropped the leading "
+                f"zero — enter it as text, e.g. 0{five[0]}.")
+    return _fail("R-01", t, s, f"Missing or too-short HS code ({detail}).", fix)
 
 
 def r02_declared_value(b: Booking) -> RuleResult:
@@ -107,20 +140,21 @@ def r05_pallet_weight(b: Booking, carrier: Optional[CarrierOption]) -> RuleResul
     if per_pallet <= limit:
         return _ok("R-05", t, s)
     min_pallets = -(-b.total_gross_weight_kg // limit)  # ceil
+    roomier = [c for c in carriers_for(b.destination_country) if c.max_weight_per_pallet_kg >= per_pallet]
+    fix = f"Spread the load over at least {int(min_pallets)} pallets"
+    fix += (f", or switch to {' / '.join(c.label for c in roomier)}, which takes this weight."
+            if roomier else f" — {limit:,.0f} kg is the highest pallet limit on this route.")
     return _fail("R-05", t, s,
-                 f"{per_pallet:,.1f} kg per pallet exceeds {carrier.label}'s limit of {limit:,.0f} kg.",
-                 f"Spread the load over at least {int(min_pallets)} pallets, or pick a carrier "
-                 "with a higher pallet weight limit.")
+                 f"{per_pallet:,.1f} kg per pallet exceeds {carrier.label}'s limit of {limit:,.0f} kg.", fix)
 
 
 def r06_dangerous_goods(b: Booking) -> RuleResult:
     t, s = "No lithium batteries, aerosols or flammable liquids", Severity.RED
     hits = []
     for i in b.items:
-        text = f"{i.sku} {i.description}".lower()
-        for category, words in DANGEROUS_KEYWORDS.items():
-            if any(w in text for w in words):
-                hits.append(f"{i.sku} ({category})")
+        category = dangerous_category(f"{i.sku} {i.description}")
+        if category:
+            hits.append(f"{i.sku} ({category})")
     if not hits:
         return _ok("R-06", t, s)
     return _fail("R-06", t, s, f"Restricted goods found: {', '.join(hits)}.",

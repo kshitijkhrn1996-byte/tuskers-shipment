@@ -6,14 +6,16 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import db
 from .agent import run_turn
 from .carriers import CARRIERS
+from .recommender import BALANCED_WEIGHTS, normalise_weights, rank_route
+from .schemas import DestinationCountry, Priority
 from .draft import apply_patch, draft_from_booking, empty_draft, missing_fields, missing_invoice_fields, try_build
 from .evaluate import evaluate
-from .excel import parse_workbook
+from .excel import parse_files
 from .invoice import build_invoice
 from .live_checks import live_issues
 
@@ -60,9 +62,35 @@ def health():
     return {"ok": True, "today": today_uk().isoformat(), "gemini": bool(os.environ.get("GEMINI_API_KEY"))}
 
 
+@app.get("/api/stats")
+def stats():
+    """Real usage numbers for the home page counter (no made-up figures)."""
+    try:
+        return {"consignments_checked": db.count("ts_bookings")}
+    except Exception:
+        return {"consignments_checked": None}
+
+
 @app.get("/api/carriers")
 def carriers():
     return [c.model_dump(mode="json") | {"label": c.label} for c in CARRIERS]
+
+
+class CompareIn(BaseModel):
+    destination_country: DestinationCountry
+    pallets: int = Field(gt=0, le=60)
+    total_gross_weight_kg: float = Field(gt=0, le=60000)
+    seller_priority: Priority = Priority.BALANCED
+    weights: Optional[dict[str, float]] = None  # cost / speed / reliability, any scale
+
+
+@app.post("/api/carriers/compare")
+def compare_carriers(body: CompareIn):
+    rec = rank_route(body.destination_country, body.pallets, body.total_gross_weight_kg,
+                     body.seller_priority, body.weights)
+    return {"per_pallet_kg": round(body.total_gross_weight_kg / body.pallets, 1),
+            "weights": normalise_weights(body.weights) or BALANCED_WEIGHTS,
+            "recommendation": rec.model_dump(mode="json")}
 
 
 def _load_or_create(conversation_id: Optional[str], prefix: str = "CHAT") -> dict:
@@ -191,14 +219,14 @@ def chat_confirm(body: ConfirmIn):
 # ---------- Part 2: file upload ----------
 
 @app.post("/api/upload")
-async def upload(file: UploadFile = File(...)):
-    data = await file.read()
+async def upload(files: list[UploadFile] = File(...)):
+    payload = [(f.filename or "upload.xlsx", await f.read()) for f in files]
     try:
-        bookings, row_errors = parse_workbook(data)
+        bookings, row_errors = parse_files(payload)
     except Exception as e:
-        raise HTTPException(400, f"Could not read the workbook: {e}")
+        raise HTTPException(400, f"Could not read the upload: {e}")
     reports = [evaluate(b, today_uk()).model_dump(mode="json") for b in bookings]
-    up = db.insert("ts_uploads", {"filename": file.filename, "booking_count": len(reports),
+    up = db.insert("ts_uploads", {"filename": ", ".join(name for name, _ in payload), "booking_count": len(reports),
                                   "blocked_count": sum(r["blocked"] for r in reports),
                                   "row_errors": [e.model_dump() for e in row_errors]})[0]
     rows = db.insert("ts_bookings", [_booking_row(r, "upload", "on_hold" if r["blocked"] else "checked",

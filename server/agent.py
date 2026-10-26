@@ -17,6 +17,7 @@ Every turn re-runs the checks on the whole draft, so a mid-chat change
 """
 import json
 import os
+import time
 from datetime import date
 from typing import Optional, TypedDict
 
@@ -131,9 +132,14 @@ def _gemini(prompt: str, json_mode: bool = True, system: Optional[str] = None) -
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     config = types.GenerateContentConfig(temperature=0 if json_mode else 0.3, system_instruction=system,
                                          response_mime_type="application/json" if json_mode else None)
-    resp = client.models.generate_content(model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
-                                          contents=prompt, config=config)
-    return resp.text
+    for attempt in range(3):  # ride out brief rate limits / 5xx
+        try:
+            return client.models.generate_content(model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+                                                  contents=prompt, config=config).text
+        except Exception:
+            if attempt == 2:
+                raise
+            time.sleep(1.5 * (attempt + 1))
 
 
 def understand(state: AgentState) -> AgentState:
@@ -290,8 +296,9 @@ def respond(state: AgentState) -> AgentState:
         else:
             rep = evaluate(booking, date.fromisoformat(state["today"]))
             report = rep.model_dump(mode="json")
-            derived = [f"{booking.cartons} cartons" if f == "cartons" else f"a declared value of £{booking.total_declared_value:,.2f}"
-                       for f in draft.get("derived", [])]
+            totals = {"cartons": f"{booking.cartons} cartons",
+                      "total_declared_value": f"a declared value of £{booking.total_declared_value:,.2f}"}
+            derived = [totals[f] for f in draft.get("derived", []) if f in totals]
             if derived and not draft.get("derived_announced"):
                 draft["derived_announced"] = True
                 lines.append(f"From your products I've taken {_join(derived)} — tell me if your paperwork says otherwise.")

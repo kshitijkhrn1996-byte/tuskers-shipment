@@ -62,3 +62,12 @@ def test_form_blank_origin_is_missing_until_marked_unknown():
     assert "items.0.country_of_origin" in missing_fields(d) and "R-09:0" not in keys(d)
     d2, _, _ = apply_patch(d, {"items": [item], "unknown": ["items.0.country_of_origin"]}, replace=True)
     assert "items.0.country_of_origin" not in missing_fields(d2) and "R-09:0" in keys(d2)
+
+
+def test_switching_shop_to_warehouse_asks_for_appointment_instead_of_assuming():
+    d, _ = patch(booking={"destination_type": "Business address"})
+    assert d["booking"]["delivery_appointment_booked"] is False and "R-08" not in keys(d)
+    d2, _, _ = apply_patch(d, {"booking": {"destination_type": "Warehouse"}})
+    assert "delivery_appointment_booked" in missing_fields(d2) and "R-08" not in keys(d2)
+    d3, _, _ = apply_patch(d2, {"booking": {"delivery_appointment_booked": False}})
+    assert "R-08" in keys(d3)

@@ -202,10 +202,10 @@ def apply_patch(draft: dict, patch: dict, replace: bool = False) -> tuple[dict, 
             b["destination_country"] = CITY_TO_COUNTRY[v]
         if field == "destination_country" and b.get("destination_city") and CITY_TO_COUNTRY[b["destination_city"]] != v:
             b.pop("destination_city")
-        if field in ("cartons", "total_declared_value") and field in draft["derived"]:
+        if field in ("cartons", "total_declared_value", "delivery_appointment_booked") and field in draft["derived"]:
             draft["derived"].remove(field)
     if replace:
-        for f in ("cartons", "total_declared_value"):
+        for f in ("cartons", "total_declared_value", "delivery_appointment_booked"):
             if f not in b and f in draft["derived"]:
                 draft["derived"].remove(f)
 
@@ -249,8 +249,14 @@ def _derive(draft: dict, notes: list[str]):
             it["cartons"] = q // upc
             notes.append(f"Worked out {it['cartons']} cartons of {it.get('description') or it['sku']} "
                          f"({q} ÷ {upc} per carton).")
+    # Business addresses don't need a slot; remember we assumed it so a later
+    # switch to a warehouse asks the seller instead of silently failing R-08.
     if b.get("destination_type") == "Business address" and b.get("delivery_appointment_booked") is None:
         b["delivery_appointment_booked"] = False
+        draft["derived"].append("delivery_appointment_booked")
+    elif b.get("destination_type") == "Warehouse" and "delivery_appointment_booked" in draft["derived"]:
+        b.pop("delivery_appointment_booked", None)
+        draft["derived"].remove("delivery_appointment_booked")
     items_ready = draft["items"] and all(it.get(f) is not None for it in draft["items"]
                                          for f in ("quantity", "unit_price", "cartons"))
     if items_ready:

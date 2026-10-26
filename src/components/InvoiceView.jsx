@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { ease } from './ui.jsx'
 import { api, gbp } from '../api.js'
 import Logo from './Logo.jsx'
 
@@ -9,12 +11,20 @@ export default function InvoiceView({ conversationId, version, onClose, onEdit }
   useEffect(() => {
     api.invoice(conversationId).then(setInv).catch((e) => setError(e.message))
   }, [conversationId, version])
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-900/50 overflow-y-auto print:bg-white print:static" onClick={onClose}>
-      <div className="max-w-4xl mx-auto my-6 px-4 print:m-0 print:p-0 print:max-w-none" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3 print:hidden">
-          <p className="text-white font-semibold">Commercial invoice</p>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25, ease }}
+      className="fixed inset-0 z-[60] overflow-y-auto bg-slate-900/30 backdrop-blur-sm print:static print:bg-white" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, y: 28, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }}
+        transition={{ duration: 0.4, ease }}
+        className="mx-auto my-8 max-w-4xl px-4 print:m-0 print:max-w-none print:p-0" onClick={(e) => e.stopPropagation()}>
+        <div className="glass mb-3 flex items-center justify-between px-4 py-2.5 print:hidden">
+          <p className="font-semibold">Commercial invoice</p>
           <div className="flex gap-2">
             <button className="btn-ghost" onClick={onEdit}>Edit details</button>
             <button className="btn-primary" onClick={() => window.print()} disabled={!inv}>Print / save PDF</button>
@@ -24,8 +34,8 @@ export default function InvoiceView({ conversationId, version, onClose, onEdit }
         {error && <div className="card p-4 text-red-700">{error}</div>}
         {!inv && !error && <div className="card p-8 text-center text-slate-500">Preparing invoice…</div>}
         {inv && <div className="print-area"><InvoiceSheet inv={inv} /></div>}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -46,7 +56,7 @@ const Missing = ({ label = 'missing' }) => <span className="inline-block rounded
 function InvoiceSheet({ inv }) {
   const reds = inv.missing.filter((m) => m.severity === 'Red')
   return (
-    <div className="bg-white rounded-xl shadow-xl print:shadow-none print:rounded-none">
+    <div className="rounded-2xl bg-white shadow-float ring-1 ring-slate-200/70 print:rounded-none print:shadow-none print:ring-0">
       {(reds.length > 0 || inv.problems.length > 0) && (
         <div className="border-b border-red-200 bg-red-50 px-6 py-3 text-sm text-red-800 rounded-t-xl print:hidden">
           {reds.length > 0 && <p><b>Missing before you can use this invoice:</b> {reds.map((m) => m.label).join(', ')}.</p>}
@@ -68,7 +78,7 @@ function InvoiceSheet({ inv }) {
           <div className="text-right">
             <Logo className="h-9 ml-auto" />
             <dl className="mt-2 text-xs grid grid-cols-[auto_auto] gap-x-3 justify-end">
-              <dt className="text-slate-500">Invoice no.</dt><dd className="font-semibold">{inv.invoice_number}</dd>
+              <dt className="text-slate-500">Invoice no.</dt><dd className="font-mono font-semibold">{inv.invoice_number}</dd>
               <dt className="text-slate-500">Date</dt><dd>{inv.invoice_date}</dd>
               <dt className="text-slate-500">Currency</dt><dd>{inv.currency}</dd>
               {inv.related_docs && <><dt className="text-slate-500">PO / contract</dt><dd>{inv.related_docs}</dd></>}
@@ -90,7 +100,7 @@ function InvoiceSheet({ inv }) {
           <div className="col-span-2"><p className="text-slate-500">Transport</p><p className="font-semibold">{inv.transport}</p><p className="text-slate-500">Collection {inv.ship_date}</p></div>
         </div>
 
-        <table className="w-full mt-5 text-xs">
+        <table className="w-full mt-5 text-xs [&_td.text-right]:font-mono">
           <thead className="text-slate-500 uppercase border-b border-slate-300">
             <tr>
               <th className="text-left py-2">Description</th><th className="text-left">HS code</th><th className="text-left">Origin</th>
@@ -100,8 +110,8 @@ function InvoiceSheet({ inv }) {
           <tbody>
             {inv.lines.map((l) => (
               <tr key={l.sku} className="border-b border-slate-100 align-top">
-                <td className="py-2"><p className="font-medium">{l.description}</p><p className="text-slate-500">{l.sku} · {l.cartons} cartons</p></td>
-                <td>{l.hs_code || <Missing />}</td>
+                <td className="py-2"><p className="font-medium">{l.description}</p><p className="text-slate-500"><span className="font-mono">{l.sku}</span> · {l.cartons} cartons</p></td>
+                <td className="font-mono">{l.hs_code || <Missing />}</td>
                 <td>{l.country_of_origin || <Missing />}</td>
                 <td className="text-right">{l.quantity.toLocaleString('en-GB')}</td>
                 <td className="text-right">{gbp(l.unit_price)}</td>
@@ -115,7 +125,7 @@ function InvoiceSheet({ inv }) {
         <div className="grid grid-cols-2 gap-6 mt-4">
           <dl className="text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 content-start">
             <dt className="text-slate-500">Packages</dt><dd>{inv.packages}</dd>
-            <dt className="text-slate-500">Marks & numbers</dt><dd>{inv.marks}</dd>
+            <dt className="text-slate-500">Marks & numbers</dt><dd className="font-mono">{inv.marks}</dd>
             <dt className="text-slate-500">Net weight</dt><dd>{inv.net_weight_kg.toLocaleString('en-GB')} kg</dd>
             <dt className="text-slate-500">Gross weight</dt><dd>{inv.gross_weight_kg.toLocaleString('en-GB')} kg</dd>
           </dl>
@@ -128,7 +138,7 @@ function InvoiceSheet({ inv }) {
               </>
             )}
             <dt className="font-semibold border-t border-slate-300 pt-1">Total invoice value</dt>
-            <dd className="text-right font-bold border-t border-slate-300 pt-1">{gbp(inv.total)} {inv.currency}</dd>
+            <dd className="text-right font-mono font-bold border-t border-slate-300 pt-1">{gbp(inv.total)} {inv.currency}</dd>
           </dl>
         </div>
 

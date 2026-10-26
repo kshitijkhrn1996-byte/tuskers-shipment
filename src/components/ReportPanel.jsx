@@ -1,82 +1,145 @@
 import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { gbp0 as gbp } from '../api.js'
+import { Rich, Spinner, ease } from './ui.jsx'
+import { Journey, TradeoffRadar } from './insights.jsx'
 
-const DOT = { pass: 'bg-emerald-500', fail_Red: 'bg-red-500', fail_Amber: 'bg-amber-400', pending: 'bg-slate-300' }
-
-export default function ReportPanel({ report, confirmed, onConfirm, onInvoice, showFailures = true }) {
-  const { booking, checks, blocked, red_count, amber_count, recommendation, confirmation, next_steps } = report
-  const fails = checks.filter((c) => c.status === 'fail')
-  const status = blocked
-    ? { label: 'On hold — fix before it ships', cls: 'bg-red-50 border-red-200 text-red-800', dot: 'bg-red-500' }
-    : amber_count
-      ? { label: 'Ready, with warnings', cls: 'bg-amber-50 border-amber-200 text-amber-900', dot: 'bg-amber-400' }
-      : { label: 'Ready to book', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800', dot: 'bg-emerald-500' }
-
+// Carrier recommendation + confirmation for a fully evaluated booking.
+export default function ReportPanel({ report, confirmed, onConfirm }) {
   return (
     <div className="space-y-4">
-      <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${status.cls}`}>
-        <span className={`w-3 h-3 rounded-full ${status.dot}`} />
-        <div className="flex-1">
-          <p className="font-semibold">{status.label}</p>
-          <p className="text-xs opacity-80">{booking.booking_id} · {booking.seller_name} · {booking.origin_city} → {booking.destination_city}, {booking.destination_country}</p>
-        </div>
-        <div className="text-right text-xs font-semibold">
-          <div className="text-red-700">{red_count} red</div>
-          <div className="text-amber-700">{amber_count} amber</div>
-        </div>
-      </div>
+      <CarrierCard recommendation={report.recommendation} priority={report.booking.seller_priority} pallets={report.booking.pallets} />
+      <ConfirmCard report={report} confirmed={confirmed} onConfirm={onConfirm} />
+    </div>
+  )
+}
 
-      <div className="card">
-        <h3 className="px-4 pt-3 pb-2 text-sm font-semibold">Pre-flight checks</h3>
-        {showFailures && fails.length > 0 && (
-          <div className="px-4 pb-3 space-y-2">
-            {fails.map((c) => (
-              <div key={c.rule_id} className={`rounded-lg border-l-4 px-3 py-2 text-sm ${c.severity === 'Red' ? 'border-red-500 bg-red-50' : 'border-amber-400 bg-amber-50'}`}>
-                <div className="flex items-center gap-2">
-                  <span className={`chip ${c.severity === 'Red' ? 'bg-red-600 text-white' : 'bg-amber-400 text-amber-950'}`}>
-                    {c.severity === 'Red' ? 'RED · blocks' : 'AMBER · warning'}
-                  </span>
-                  <span className="font-semibold">{c.rule_id} {c.title}</span>
-                </div>
-                <p className="mt-1 text-slate-700"><b>Problem:</b> {c.fault}</p>
-                <p className="text-slate-700"><b>Fix:</b> {c.fix}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        <ul className="grid sm:grid-cols-2 gap-x-4 px-4 pb-3 text-sm">
-          {checks.map((c) => (
-            <li key={c.rule_id} className="flex items-center gap-2 py-1" title={c.fault || ''}>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[c.status === 'fail' ? `fail_${c.severity}` : c.status]}`} />
-              <span className="text-slate-500 w-9">{c.rule_id}</span>
-              <span className={c.status === 'fail' ? 'font-medium' : 'text-slate-600'}>{c.title}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <CarrierCard recommendation={recommendation} priority={booking.seller_priority} pallets={booking.pallets} />
-
-      <div className="card p-4 space-y-3">
-        <h3 className="text-sm font-semibold">Confirmation</h3>
-        <p className="text-sm text-slate-700">{confirmation}</p>
+function CarrierCard({ recommendation, priority, pallets }) {
+  const { chosen, ranked, excluded, reason, note } = recommendation
+  const all = [...ranked, ...excluded].sort((a, b) => a.option.carrier.localeCompare(b.option.carrier))
+  const isPick = (s) => chosen && s.option.carrier === chosen.option.carrier && s.option.service === chosen.option.service
+  return (
+    <motion.section layout className="glass p-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase">{blocked ? 'To do' : 'What happens next'}</p>
-          <ol className="mt-1 space-y-1 text-sm list-decimal list-inside text-slate-700">
-            {next_steps.map((s) => <li key={s}>{s}</li>)}
-          </ol>
+          <p className="label">Recommended carrier</p>
+          <p className="text-sm text-slate-500 mt-0.5">Ranked for the seller’s priority, after removing services that can’t take the load</p>
         </div>
-        {confirmed
-          ? <div className="rounded-lg bg-brand-light text-brand-dark px-3 py-2 text-sm font-semibold">Booked ✓ Reference {confirmed.reference}</div>
-          : <ConfirmButton blocked={blocked} onConfirm={onConfirm} />}
-        {onInvoice && (
-          <button className="btn-ghost w-full" onClick={onInvoice}>
-            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 2.5h7l3 3v12H5z M12 2.5v3h3 M7.5 9h5 M7.5 12h5 M7.5 15h3" strokeLinejoin="round" /></svg>
-            Commercial invoice
-          </button>
-        )}
+        <span className="chip shrink-0 bg-slate-900 text-white">Priority · {priority}</span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {all.map((s) => {
+          const pick = isPick(s)
+          const out = Boolean(s.excluded_reason)
+          return (
+            <motion.div key={s.option.carrier + s.option.service} layout
+              whileHover={out ? {} : { y: -2 }} transition={{ duration: 0.2, ease }}
+              className={`relative rounded-xl border p-3.5 transition-shadow duration-200 ${out ? 'border-dashed border-slate-200 bg-slate-50/60 opacity-60'
+                : pick ? 'border-transparent bg-white shadow-lift' : 'border-slate-200/80 bg-white/70 hover:shadow-lift'}`}>
+              {pick && (
+                <motion.span layoutId="pick-ring" transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                  className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-teal-500/70 shadow-[0_0_0_6px_rgba(20,184,166,0.08)]" />
+              )}
+              <div className="flex h-5 items-center">
+                {pick && <span className="chip bg-teal-600 text-white">★ Pick</span>}
+                {out && <span className="chip bg-slate-200 text-slate-600">Too heavy</span>}
+              </div>
+              <p className="mt-1 font-semibold leading-tight">{s.option.carrier}</p>
+              <p className="text-xs text-slate-500">{s.option.service}</p>
+              <p className="mt-3 font-mono text-xl font-semibold tracking-tight">{gbp(s.total_cost)}</p>
+              <p className="font-mono text-[11px] text-slate-500">{pallets} × {gbp(s.option.price_per_pallet)}</p>
+              <div className="mt-3 space-y-1.5 text-xs">
+                <Metric label="Transit" value={`${s.option.transit_days} d`} pct={(1 - (s.option.transit_days - 1) / 5) * 100} />
+                <Metric label="On time" value={`${s.option.on_time_rate}%`} pct={((s.option.on_time_rate - 85) / 15) * 100} />
+                <div className="flex justify-between text-slate-500"><span>Max / pallet</span><span className="font-mono text-slate-700">{s.option.max_weight_per_pallet_kg} kg</span></div>
+                {s.score != null && <div className="flex justify-between text-slate-500"><span>Score</span><span className="font-mono text-slate-700">{s.score.toFixed(2)}</span></div>}
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {!chosen && <p className="mt-4 rounded-xl border border-red-200/80 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">No carrier can take this load as booked.</p>}
+      <div className="mt-5 space-y-4 border-t border-slate-200/70 pt-5">
+        <TradeoffRadar options={all} pickKey={chosen ? chosen.option.carrier + chosen.option.service : null} />
+        <p className="text-sm leading-relaxed text-slate-600"><span className="font-medium text-ink">Why · </span><Rich text={note ? reason.replace(note, '').trim() : reason} /></p>
+      </div>
+      {note && (
+        <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease }}
+          className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-sm text-amber-900">
+          <Rich text={note} />
+        </motion.p>
+      )}
+    </motion.section>
+  )
+}
+
+function Metric({ label, value, pct }) {
+  return (
+    <div>
+      <div className="flex justify-between text-slate-500"><span>{label}</span><span className="font-mono text-slate-700">{value}</span></div>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
+        <motion.div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-teal-600"
+          initial={{ width: 0 }} animate={{ width: `${Math.max(6, Math.min(100, pct))}%` }} transition={{ duration: 0.7, ease }} />
       </div>
     </div>
+  )
+}
+
+function ConfirmCard({ report, confirmed, onConfirm }) {
+  const { blocked, confirmation, next_steps, booking } = report
+  const chosen = report.recommendation.chosen
+  return (
+    <motion.section layout className="glass p-5">
+      <div className="flex items-center justify-between">
+        <p className="label">{blocked ? 'Before it can ship' : 'Confirmation'}</p>
+        {blocked ? <span className="chip border border-red-200/70 bg-red-50 text-red-700">On hold</span>
+          : <span className="chip border border-emerald-200/70 bg-emerald-50 text-emerald-700">Ready</span>}
+      </div>
+      {chosen && (
+        <div className="mt-3 rounded-xl border border-slate-200/70 bg-white/60 px-3 pb-3">
+          <Journey key={`${booking.ready_to_ship_date}-${chosen.option.transit_days}-${booking.destination_city}`}
+            readyDate={booking.ready_to_ship_date} transitDays={chosen.option.transit_days}
+            origin={booking.origin_city} destination={booking.destination_city} country={booking.destination_country} />
+        </div>
+      )}
+      <p className="mt-3 text-sm leading-relaxed text-slate-700"><Rich text={confirmation} /></p>
+
+      <ol className="relative mt-4 space-y-3 pl-6">
+        <span className="absolute bottom-1.5 left-[7px] top-1.5 w-px bg-gradient-to-b from-slate-300 to-transparent" />
+        {next_steps.map((s, i) => (
+          <motion.li key={s} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06, duration: 0.3, ease }}
+            className="relative text-sm leading-relaxed text-slate-700">
+            <span className={`absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 bg-white ${blocked ? 'border-red-400' : 'border-teal-500'}`} />
+            <Rich text={s} />
+          </motion.li>
+        ))}
+      </ol>
+
+      <div className="mt-5 space-y-2">
+        <AnimatePresence mode="wait">
+          {confirmed ? (
+            <motion.div key="done" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease }}
+              className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2.5">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-500 text-white">
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                  <motion.path d="M3.5 8.5l3 3 6-7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.45, ease, delay: 0.1 }} />
+                </svg>
+              </span>
+              <div className="text-sm">
+                <p className="font-semibold text-emerald-800">Booked</p>
+                <p className="text-emerald-700">Reference <span className="font-mono font-semibold">{confirmed.reference}</span></p>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div key="btn" exit={{ opacity: 0, scale: 0.98 }}>
+              <ConfirmButton blocked={blocked} onConfirm={onConfirm} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.section>
   )
 }
 
@@ -89,57 +152,12 @@ function ConfirmButton({ blocked, onConfirm }) {
   }
   return (
     <div>
-      <button className="btn-primary w-full" disabled={blocked || busy} onClick={click}>
-        {blocked ? 'Fix red issues to confirm' : busy ? 'Confirming…' : 'Confirm booking'}
+      <button className={blocked ? 'btn w-full border border-slate-200 bg-slate-100 text-slate-500' : 'btn-primary w-full py-2.5'} disabled={blocked || busy} onClick={click}>
+        {blocked ? (
+          <><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="7" width="10" height="7" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg> Fix blockers to confirm</>
+        ) : busy ? <><Spinner /> Confirming…</> : 'Confirm booking'}
       </button>
-      {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
-    </div>
-  )
-}
-
-function CarrierCard({ recommendation, priority, pallets }) {
-  const { chosen, ranked, excluded, reason } = recommendation
-  const rows = [...ranked, ...excluded]
-  return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Recommended carrier</h3>
-        <span className="chip bg-slate-100 text-slate-700">Priority: {priority}</span>
-      </div>
-      {chosen ? (
-        <div className="mt-2 flex items-end justify-between">
-          <div>
-            <p className="text-lg font-bold">{chosen.option.carrier} · {chosen.option.service}</p>
-            <p className="text-sm text-slate-600">{chosen.option.transit_days} days · {chosen.option.on_time_rate}% on time · max {chosen.option.max_weight_per_pallet_kg} kg/pallet</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xl font-bold">{gbp(chosen.total_cost)}</p>
-            <p className="text-xs text-slate-500">{pallets} × {gbp(chosen.option.price_per_pallet)}</p>
-          </div>
-        </div>
-      ) : <p className="mt-2 font-semibold text-red-700">No carrier can take this load as booked.</p>}
-      <p className="text-sm text-slate-600 mt-2"><b>Why:</b> {reason}</p>
-      <table className="w-full text-xs mt-3">
-        <thead className="text-slate-500 uppercase">
-          <tr><th className="text-left py-1">Option</th><th className="text-right">Cost</th><th className="text-right">Days</th><th className="text-right">On time</th>
-            {priority === 'Balanced' && <th className="text-right">Score</th>}<th className="text-right">Status</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((s) => {
-            const isPick = chosen && s.option.carrier === chosen.option.carrier && s.option.service === chosen.option.service
-            return (
-              <tr key={s.option.carrier + s.option.service} className={`border-t border-slate-100 ${isPick ? 'font-semibold' : ''} ${s.excluded_reason ? 'text-slate-400' : ''}`}>
-                <td className="py-1.5">{s.option.carrier} · {s.option.service}</td>
-                <td className="text-right">{gbp(s.total_cost)}</td>
-                <td className="text-right">{s.option.transit_days}</td>
-                <td className="text-right">{s.option.on_time_rate}%</td>
-                {priority === 'Balanced' && <td className="text-right">{s.score ?? '—'}</td>}
-                <td className="text-right">{s.excluded_reason ? 'too heavy' : isPick ? '★ pick' : 'fits'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
     </div>
   )
 }

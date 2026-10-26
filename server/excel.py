@@ -1,11 +1,15 @@
-"""Read the judges' workbook (Sheet 1 Bookings + Sheet 2 Items).
+"""Read the judges' Bookings (Sheet 1) and Items (Sheet 2) data.
 
-Headers are matched loosely (case, spacing, units in brackets) so small
-wording differences in the template don't break parsing.
+Accepts one workbook with both sheets, or several files (xlsx or csv).
+Each sheet or file is recognised by its header row, not its name, so
+renamed sheets and the template's other sheets (rate card, rulebook,
+guides) don't matter. Headers are matched loosely (case, spacing, units
+in brackets).
 """
+import csv
 import io
 import re
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from openpyxl import load_workbook
 from pydantic import BaseModel, ValidationError
@@ -27,7 +31,6 @@ ITEM_COLS = {
     "cartons": "cartons", "unitweight": "unit_weight_kg", "countryoforigin": "country_of_origin",
 }
 
-
 # Row 3 of the template is a grey example. Judges enter data from row 4, so
 # skip that row only if it is left in exactly as shipped.
 EXAMPLE_ROWS = {
@@ -35,14 +38,6 @@ EXAMPLE_ROWS = {
      "05-11-2026", "Cheapest", "3", "90", "5400", "GBP", "620", "Yes"),
     ("BK-001", "MUG-01", "Ceramic coffee mug, 350 ml", "691200", "1080", "5", "12", "90", "0.5", "United Kingdom"),
 }
-
-
-def _is_example(row) -> bool:
-    def norm(v):
-        if isinstance(v, float) and v.is_integer():
-            v = int(v)
-        return str(v).strip() if v is not None else ""
-    return tuple(norm(v) for v in row if v is not None) in EXAMPLE_ROWS
 
 
 class RowError(BaseModel):
@@ -55,31 +50,59 @@ def _norm(h: Any) -> str:
     return re.sub(r"[^a-z]", "", h)
 
 
-def _rows(ws, colmap: dict[str, str]) -> list[dict]:
-    rows = ws.iter_rows(values_only=True)
-    header_idx: Optional[dict[int, str]] = None
-    out = []
+def _cell(v) -> str:
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    return str(v).strip() if v is not None else ""
+
+
+def _canon(v) -> str:
+    """Cell text with numbers normalised ("5.00" == 5.0 == "5") for comparisons."""
+    s = _cell(v)
+    try:
+        f = float(s)
+    except ValueError:
+        return s
+    return str(int(f)) if f.is_integer() else f"{f:g}"
+
+
+def _is_example(row) -> bool:
+    return tuple(_canon(v) for v in row if _cell(v)) in EXAMPLE_ROWS
+
+
+def _classify(row) -> Optional[tuple[str, dict[int, str]]]:
+    """Is this a Bookings or Items header row? Returns (kind, column index -> field)."""
+    b = {i: BOOKING_COLS[_norm(c)] for i, c in enumerate(row) if _norm(c) in BOOKING_COLS}
+    if "booking_id" in b.values() and {"seller_name", "destination_city", "pallets"} & set(b.values()):
+        return "bookings", b
+    it = {i: ITEM_COLS[_norm(c)] for i, c in enumerate(row) if _norm(c) in ITEM_COLS}
+    if "booking_id" in it.values() and {"sku", "units_per_carton", "hs_code"} & set(it.values()):
+        return "items", it
+    return None
+
+
+def _scan(rows: Iterable) -> tuple[Optional[str], list[dict]]:
+    kind, idx, out = None, None, []
     for row in rows:
-        if header_idx is not None and _is_example(row):
+        row = tuple(row)
+        if idx is None:
+            found = _classify(row)
+            if found:
+                kind, idx = found
             continue
-        if header_idx is None:
-            found = {i: colmap[_norm(c)] for i, c in enumerate(row) if _norm(c) in colmap}
-            if "booking_id" in found.values() and len(found) >= 3:
-                header_idx = found
+        if all(not _cell(v) for v in row) or _is_example(row):
             continue
-        if all(v is None or str(v).strip() == "" for v in row):
-            continue
-        out.append({field: row[i] for i, field in header_idx.items() if i < len(row)})
-    if header_idx is None:
-        raise ValueError(f"Could not find a header row with 'Booking ID' in sheet {ws.title!r}")
-    return out
+        out.append({field: (row[i] if row[i] != "" else None) for i, field in idx.items() if i < len(row)})
+    return kind, out
 
 
-def _sheet(wb, name: str, fallback: int):
+def _tables(name: str, data: bytes):
+    if name.lower().endswith(".csv"):
+        yield csv.reader(io.StringIO(data.decode("utf-8-sig", errors="replace")))
+        return
+    wb = load_workbook(io.BytesIO(data), data_only=True, read_only=True)
     for ws in wb.worksheets:
-        if name in ws.title.lower():
-            return ws
-    return wb.worksheets[fallback]
+        yield ws.iter_rows(values_only=True)
 
 
 def _fmt(e: ValidationError) -> list[str]:
@@ -90,18 +113,32 @@ def _fmt(e: ValidationError) -> list[str]:
     return msgs
 
 
-def parse_workbook(data: bytes) -> tuple[list[Booking], list[RowError]]:
-    wb = load_workbook(io.BytesIO(data), data_only=True, read_only=True)
-    bookings_raw = _rows(_sheet(wb, "booking", 0), BOOKING_COLS)
-    items_raw = _rows(_sheet(wb, "item", 1), ITEM_COLS)
+def parse_files(files: list[tuple[str, bytes]]) -> tuple[list[Booking], list[RowError]]:
+    bookings_raw, items_raw, kinds = [], [], set()
+    for name, data in files:
+        for rows in _tables(name, data):
+            kind, records = _scan(rows)
+            kinds.add(kind)
+            if kind == "bookings":
+                bookings_raw += records
+            elif kind == "items":
+                items_raw += records
+    if "bookings" not in kinds:
+        raise ValueError("Couldn't find a Bookings table (a header row with Booking ID, Seller name, "
+                         "Destination city, Pallets …). Upload the Bookings and Items sheets.")
 
     by_booking: dict[str, list[dict]] = {}
     for it in items_raw:
-        by_booking.setdefault(str(it.get("booking_id", "")).strip(), []).append(it)
+        by_booking.setdefault(_cell(it.get("booking_id")), []).append(it)
 
-    bookings, errors = [], []
+    bookings, errors, seen = [], [], set()
     for raw in bookings_raw:
-        bid = str(raw.get("booking_id", "")).strip()
+        bid = _cell(raw.get("booking_id"))
+        if bid in seen:
+            errors.append(RowError(booking_id=bid, errors=["Duplicate Booking ID — each booking needs its own ID; "
+                                                           "this repeated row was skipped."]))
+            continue
+        seen.add(bid)
         raw["items"] = by_booking.get(bid, [])
         try:
             b = Booking.model_validate(raw)
@@ -109,7 +146,16 @@ def parse_workbook(data: bytes) -> tuple[list[Booking], list[RowError]]:
             errors.append(RowError(booking_id=bid or "?", errors=_fmt(e)))
             continue
         if not b.items:
-            errors.append(RowError(booking_id=bid, errors=["No items found for this booking in the Items sheet"]))
+            errors.append(RowError(booking_id=bid, errors=["No products found for this booking on the Items sheet."]))
             continue
         bookings.append(b)
+    for bid in by_booking:
+        if bid and bid not in seen:
+            errors.append(RowError(booking_id=bid, errors=[f"{len(by_booking[bid])} product row(s) on the Items sheet "
+                                                           "use this Booking ID, but there's no such booking on the "
+                                                           "Bookings sheet."]))
     return bookings, errors
+
+
+def parse_workbook(data: bytes) -> tuple[list[Booking], list[RowError]]:
+    return parse_files([("upload.xlsx", data)])
