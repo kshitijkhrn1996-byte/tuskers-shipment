@@ -24,6 +24,7 @@ export const api = {
   confirmBooking: (reference) => call(`/api/bookings/${encodeURIComponent(reference)}/confirm`, { method: 'POST' }),
   carriers: () => call('/api/carriers'),
   compare: (body) => call('/api/carriers/compare', json(body)),
+  hsSearch: (q) => call(`/api/hs/search?q=${encodeURIComponent(q)}`),
   help: (question, context) => call('/api/help', json({ question, context })),
 }
 
@@ -50,4 +51,11 @@ export function useCarriers() {
   }, [])
   useEffect(() => { load() }, [load])
   return { ...state, retry: load }
+}
+
+// Cross-component signals for the HS finder (it lives in the floating dock, the booking lives in the workspace).
+export const hsBus = {
+  open: (detail) => window.dispatchEvent(new CustomEvent('tuskers:open-hs', { detail })),
+  apply: (detail) => window.dispatchEvent(new CustomEvent('tuskers:apply-hs', { detail })),
+  items: (detail) => window.dispatchEvent(new CustomEvent('tuskers:items', { detail })),
 }

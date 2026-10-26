@@ -1,0 +1,1319 @@
+[
+ {
+  "query": "cotton t-shirt",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "mens hoodie",
+  "acceptable_prefixes": [
+   "61102091",
+   "61103091"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "womens jeans",
+  "acceptable_prefixes": [
+   "62046231"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "leather wallet",
+  "acceptable_prefixes": [
+   "42023100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "scented candle",
+  "acceptable_prefixes": [
+   "34060000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "ceramic mug",
+  "acceptable_prefixes": [
+   "69120023",
+   "69111000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "english breakfast tea bags",
+  "acceptable_prefixes": [
+   "09023000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "single malt scotch",
+  "acceptable_prefixes": [
+   "22083030"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "gin",
+  "acceptable_prefixes": [
+   "22085011"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "silver necklace",
+  "acceptable_prefixes": [
+   "71131100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "perfume",
+  "acceptable_prefixes": [
+   "33030010"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "shampoo",
+  "acceptable_prefixes": [
+   "33051000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "board game",
+  "acceptable_prefixes": [
+   "95049080"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "teddy bear",
+  "acceptable_prefixes": [
+   "95030041"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "paperback novel",
+  "acceptable_prefixes": [
+   "49019900"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wireless earbuds",
+  "acceptable_prefixes": [
+   "85183000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "power bank",
+  "acceptable_prefixes": [
+   "85076000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "laptop",
+  "acceptable_prefixes": [
+   "84713000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "yoga mat",
+  "acceptable_prefixes": [
+   "95069190"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "dog collar",
+  "acceptable_prefixes": [
+   "42010000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "honey",
+  "acceptable_prefixes": [
+   "04090000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "bath towel",
+  "acceptable_prefixes": [
+   "63026000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "running shoes",
+  "acceptable_prefixes": [
+   "64041100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "baseball cap",
+  "acceptable_prefixes": [
+   "65050030"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "greeting card",
+  "acceptable_prefixes": [
+   "49090000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "vinyl record",
+  "acceptable_prefixes": [
+   "85238090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "electric guitar",
+  "acceptable_prefixes": [
+   "92079010"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "fudge",
+  "acceptable_prefixes": [
+   "17049075"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "shortbread",
+  "acceptable_prefixes": [
+   "19053199",
+   "19053130"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "roasted almonds",
+  "acceptable_prefixes": [
+   "20081993"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "T-SHIRTS!!",
+  "acceptable_prefixes": [
+   "61091000",
+   "61099020"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "Candles x 12",
+  "acceptable_prefixes": [
+   "34060000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "Mugs (set of 4)",
+  "acceptable_prefixes": [
+   "69120023",
+   "69111000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "hoodei",
+  "acceptable_prefixes": [
+   "61102091",
+   "61102099",
+   "61103091",
+   "61103099"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "jewlery",
+  "acceptable_prefixes": [
+   "71"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "perfum",
+  "acceptable_prefixes": [
+   "33030010"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "tshrit",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "earbudds",
+  "acceptable_prefixes": [
+   "85183000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wallett",
+  "acceptable_prefixes": [
+   "42023100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "sneakers",
+  "acceptable_prefixes": [
+   "64041100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "sweater",
+  "acceptable_prefixes": [
+   "6110"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "jewelry",
+  "acceptable_prefixes": [
+   "71"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "cookies",
+  "acceptable_prefixes": [
+   "1905"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "candy",
+  "acceptable_prefixes": [
+   "1704"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "diapers",
+  "acceptable_prefixes": [
+   "96190081"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "stroller",
+  "acceptable_prefixes": [
+   "87150010"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "pants",
+  "acceptable_prefixes": [
+   "6203",
+   "6204",
+   "6103",
+   "6104",
+   "6108",
+   "6107"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "cell phone",
+  "acceptable_prefixes": [
+   "85171300"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "chips",
+  "acceptable_prefixes": [
+   "20052020"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "iphone 15",
+  "acceptable_prefixes": [
+   "85171300"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "iphone case",
+  "acceptable_prefixes": [
+   "39269097",
+   "42023100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "airpods",
+  "acceptable_prefixes": [
+   "85183000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "kindle",
+  "acceptable_prefixes": [
+   "85437005"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "apple watch",
+  "acceptable_prefixes": [
+   "85176200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "nintendo switch",
+  "acceptable_prefixes": [
+   "95045000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "lego",
+  "acceptable_prefixes": [
+   "95030035"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "crocs",
+  "acceptable_prefixes": [
+   "64029939"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "dr martens boots",
+  "acceptable_prefixes": [
+   "6403"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "thermos",
+  "acceptable_prefixes": [
+   "96170000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "tea towel",
+  "acceptable_prefixes": [
+   "63029100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wine glasses",
+  "acceptable_prefixes": [
+   "70133799"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "whisky glass",
+  "acceptable_prefixes": [
+   "70133799"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "dog food",
+  "acceptable_prefixes": [
+   "23091090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "phone charger",
+  "acceptable_prefixes": [
+   "85044"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "laptop bag",
+  "acceptable_prefixes": [
+   "42021291"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "coffee mug",
+  "acceptable_prefixes": [
+   "69120023",
+   "69111000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "chocolate biscuits",
+  "acceptable_prefixes": [
+   "19053119"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "candle holder",
+  "acceptable_prefixes": [
+   "94055000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "hair dryer",
+  "acceptable_prefixes": [
+   "85163100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "baby shoes",
+  "acceptable_prefixes": [
+   "64"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wine rack",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "beer glass",
+  "acceptable_prefixes": [
+   "70133799"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "gin glass",
+  "acceptable_prefixes": [
+   "70133799"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "soap dish",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "tea set",
+  "acceptable_prefixes": [
+   "69111000",
+   "69120023"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "linen shirt",
+  "acceptable_prefixes": [
+   "62059080",
+   "6205"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "bamboo socks",
+  "acceptable_prefixes": [
+   "6115"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "silk pyjamas",
+  "acceptable_prefixes": [
+   "6108",
+   "6207",
+   "6208"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "merino base layer",
+  "acceptable_prefixes": [
+   "6110",
+   "6109"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "gold plated silver ring",
+  "acceptable_prefixes": [
+   "71131100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "gift",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "clothes",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "samples",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "stuff",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "accessories",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "parts",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "mixed items",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "handmade",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "vape",
+  "acceptable_prefixes": [
+   "2404",
+   "8543"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "cbd oil",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "kitchen knife",
+  "acceptable_prefixes": [
+   "82119200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "lithium battery",
+  "acceptable_prefixes": [
+   "85065",
+   "85076000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "pepper spray",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "61091000",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "6109.10.00",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "04090000",
+  "acceptable_prefixes": [
+   "04090000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "4090000",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "610910",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "12345678",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "6109 10 00 10",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "saxophone",
+  "acceptable_prefixes": [
+   "9205"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "microscope",
+  "acceptable_prefixes": [
+   "9011"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "surfboard",
+  "acceptable_prefixes": [
+   "9506"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "chess set",
+  "acceptable_prefixes": [
+   "9504"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "sewing machine",
+  "acceptable_prefixes": [
+   "8452"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "pizza oven",
+  "acceptable_prefixes": [
+   "8516",
+   "7321",
+   "8419"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "typewriter",
+  "acceptable_prefixes": [
+   "8472",
+   "8469"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "violin bow",
+  "acceptable_prefixes": [
+   "9209"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "golf trolley",
+  "acceptable_prefixes": [
+   "9506",
+   "8716"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wetsuit",
+  "acceptable_prefixes": [
+   "6113",
+   "4015"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "false eyelashes",
+  "acceptable_prefixes": [
+   "6704"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "tattoo ink",
+  "acceptable_prefixes": [
+   "3215"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "dried flowers",
+  "acceptable_prefixes": [
+   "0603"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "ladies cashmere cardigan",
+  "acceptable_prefixes": [
+   "61101290"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "kids football boots",
+  "acceptable_prefixes": [
+   "64041100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "mens leather brogues",
+  "acceptable_prefixes": [
+   "64039996"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "organic cotton tee",
+  "acceptable_prefixes": [
+   "61091000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "polyester gym leggings",
+  "acceptable_prefixes": [
+   "61046300"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "silk tie",
+  "acceptable_prefixes": [
+   "62151000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wool beanie",
+  "acceptable_prefixes": [
+   "65050090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "sterling silver earrings",
+  "acceptable_prefixes": [
+   "71131100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "rose gold plated bracelet",
+  "acceptable_prefixes": [
+   "71171900"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "vegan leather tote",
+  "acceptable_prefixes": [
+   "42022210"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "canvas backpack",
+  "acceptable_prefixes": [
+   "42029291"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "hard shell carry on",
+  "acceptable_prefixes": [
+   "42021250"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "lip gloss",
+  "acceptable_prefixes": [
+   "33041000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "face serum",
+  "acceptable_prefixes": [
+   "33049900"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "beard oil",
+  "acceptable_prefixes": [
+   "33059000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "bath salts",
+  "acceptable_prefixes": [
+   "33073000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "handmade soap bar",
+  "acceptable_prefixes": [
+   "34011100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "soy wax candle",
+  "acceptable_prefixes": [
+   "34060000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "earl grey loose leaf",
+  "acceptable_prefixes": [
+   "09023000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "ground coffee 250g",
+  "acceptable_prefixes": [
+   "09012100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "salted caramel fudge",
+  "acceptable_prefixes": [
+   "17049075"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "dark chocolate bar",
+  "acceptable_prefixes": [
+   "18063290"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "strawberry jam",
+  "acceptable_prefixes": [
+   "20079933"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "london dry gin 70cl",
+  "acceptable_prefixes": [
+   "22085011"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "craft ipa cans",
+  "acceptable_prefixes": [
+   "22030009"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "english sparkling wine",
+  "acceptable_prefixes": [
+   "22041098"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "dog treats",
+  "acceptable_prefixes": [
+   "23091090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "stoneware mug",
+  "acceptable_prefixes": [
+   "69120023"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "champagne flutes",
+  "acceptable_prefixes": [
+   "70133799"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "pint glasses",
+  "acceptable_prefixes": [
+   "70133799"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "chef knife",
+  "acceptable_prefixes": [
+   "82119200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "cast iron skillet",
+  "acceptable_prefixes": [
+   "73239100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "linen tea towel",
+  "acceptable_prefixes": [
+   "63029"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "duvet cover set",
+  "acceptable_prefixes": [
+   "63022100",
+   "63023100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "fleece throw",
+  "acceptable_prefixes": [
+   "63014090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "photo frame",
+  "acceptable_prefixes": [
+   "44149000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "fairy lights",
+  "acceptable_prefixes": [
+   "94054200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "hardback cookbook",
+  "acceptable_prefixes": [
+   "49019900"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "a5 notebook",
+  "acceptable_prefixes": [
+   "48201030"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "art print a3",
+  "acceptable_prefixes": [
+   "49119100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "vinyl stickers",
+  "acceptable_prefixes": [
+   "49119900"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "jigsaw 1000 pieces",
+  "acceptable_prefixes": [
+   "95030061",
+   "95030069"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "plush unicorn",
+  "acceptable_prefixes": [
+   "95030041"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "rc car",
+  "acceptable_prefixes": [
+   "95030075"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "mini drone",
+  "acceptable_prefixes": [
+   "88062110"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "mountain bike",
+  "acceptable_prefixes": [
+   "87120030"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "bike helmet",
+  "acceptable_prefixes": [
+   "65061080"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "golf balls",
+  "acceptable_prefixes": [
+   "95063200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "fly fishing reel",
+  "acceptable_prefixes": [
+   "95073000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "usb c cable",
+  "acceptable_prefixes": [
+   "85444290"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "gaming mouse",
+  "acceptable_prefixes": [
+   "84716070"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "mechanical keyboard",
+  "acceptable_prefixes": [
+   "84716060"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "portable ssd 1tb",
+  "acceptable_prefixes": [
+   "85235110"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "aa batteries",
+  "acceptable_prefixes": [
+   "85061011"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "echo dot",
+  "acceptable_prefixes": [
+   "85176200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "oled tv",
+  "acceptable_prefixes": [
+   "85287280",
+   "85287240"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "hair straighteners",
+  "acceptable_prefixes": [
+   "85163200"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "espresso machine",
+  "acceptable_prefixes": [
+   "85167100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "acoustic guitar",
+  "acceptable_prefixes": [
+   "92029030"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "guitar strings",
+  "acceptable_prefixes": [
+   "92093000"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "clarinet",
+  "acceptable_prefixes": [
+   "92059090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "socket set",
+  "acceptable_prefixes": [
+   "82041100"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "cordless drill",
+  "acceptable_prefixes": [
+   "84672110"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "brake discs",
+  "acceptable_prefixes": [
+   "87083091",
+   "87083099"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "paddle board",
+  "acceptable_prefixes": [
+   "95062900"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "chess set",
+  "acceptable_prefixes": [
+   "95049080"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "wetsuit",
+  "acceptable_prefixes": [
+   "61130090"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "presents",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "spare parts",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "xmas gifts",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "tablet",
+  "acceptable_prefixes": [
+   "84713000",
+   "17049075"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "pants",
+  "acceptable_prefixes": [
+   "6103",
+   "6104",
+   "6107",
+   "6108",
+   "6203",
+   "6204"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "pepper spray",
+  "acceptable_prefixes": [],
+  "expect": "no confident match / ask user"
+ },
+ {
+  "query": "ballpoint pens",
+  "acceptable_prefixes": [
+   "96081099"
+  ],
+  "expect": "one of the prefixes in top 3"
+ },
+ {
+  "query": "sultanas",
+  "acceptable_prefixes": [
+   "08062030"
+  ],
+  "expect": "one of the prefixes in top 3"
+ }
+]

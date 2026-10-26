@@ -18,6 +18,8 @@ from .evaluate import evaluate
 from .excel import parse_files
 from .invoice import build_invoice
 from .live_checks import live_issues
+from . import hs
+from concurrent.futures import ThreadPoolExecutor
 
 app = FastAPI(title="Tuskers Shipment Booking")
 
@@ -50,7 +52,7 @@ def snapshot(draft: dict) -> dict:
     return {
         "draft": draft,
         "missing": missing_fields(draft),
-        "issues": [i.model_dump() for i in live_issues(draft, today)],
+        "issues": [i.model_dump() for i in live_issues(draft, today)] + hs.item_issues(draft["items"]),
         "build_error": build_error,
         "report": report.model_dump(mode="json") if report else None,
         "invoice_missing": missing_invoice_fields(draft),
@@ -69,6 +71,19 @@ def stats():
         return {"consignments_checked": db.count("ts_bookings")}
     except Exception:
         return {"consignments_checked": None}
+
+
+@app.get("/api/hs/search")
+def hs_search(q: str):
+    return {"query": q, **hs.find_full(q, limit=6)}
+
+
+@app.get("/api/hs/{code}")
+def hs_lookup(code: str):
+    info = hs.lookup(code)
+    if not info:
+        raise HTTPException(404, f"{code} is not a valid HS code")
+    return info
 
 
 @app.get("/api/carriers")
@@ -132,6 +147,13 @@ def chat(body: ChatIn):
 
     draft = out["draft"]
     snap = snapshot(draft)
+    ref = [i for i in snap["issues"] if i.get("kind") in ("hs", "sku")]
+    new_ref = [i for i in ref if i["key"] not in draft.get("ref_keys", [])]
+    draft["ref_keys"] = [i["key"] for i in ref]
+    if new_ref:
+        out["reply"] += (f"\nI also checked your HS codes and SKUs against our reference data — "
+                         f"{len(new_ref)} entr{'y looks' if len(new_ref) == 1 else 'ies look'} wrong. Details below.")
+        out["new_issues"] = out.get("new_issues", []) + new_ref
     history = history + [{"role": "user", "content": body.message}, {"role": "assistant", "content": out["reply"]}]
     reply, confirmed = out["reply"], None
     if out.get("confirm_requested"):
@@ -192,6 +214,7 @@ def invoice(body: InvoiceIn):
 
 
 def _confirm(report: dict, conversation_id: Optional[str], source: str) -> dict:
+    hs.remember(report["booking"]["items"])
     return db.insert("ts_bookings", _booking_row(report, source, "confirmed", conversation_id=conversation_id))[0]
 
 
@@ -226,6 +249,11 @@ async def upload(files: list[UploadFile] = File(...)):
     except Exception as e:
         raise HTTPException(400, f"Could not read the upload: {e}")
     reports = [evaluate(b, today_uk()).model_dump(mode="json") for b in bookings]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        refs = list(pool.map(lambda r: hs.item_issues(r["booking"]["items"]), reports))
+    for r, issues in zip(reports, refs):
+        r["advisories"] += [{"message": i["message"], "fix": i["fix"], "severity": i["severity"], "kind": i["kind"],
+                             "query": i.get("query")} for i in issues]
     up = db.insert("ts_uploads", {"filename": ", ".join(name for name, _ in payload), "booking_count": len(reports),
                                   "blocked_count": sum(r["blocked"] for r in reports),
                                   "row_errors": [e.model_dump() for e in row_errors]})[0]
@@ -244,6 +272,7 @@ def confirm_uploaded(reference: str):
     if row["report"]["blocked"]:
         raise HTTPException(400, "Fix the red issues before confirming")
     db.update("ts_bookings", {"reference": reference}, {"status": "confirmed"})
+    hs.remember(row["booking"]["items"])
     return {"reference": reference, "message": _confirmed_text(row)}
 
 

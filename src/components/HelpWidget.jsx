@@ -1,12 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '../api.js'
 import { Rich, ease } from './ui.jsx'
+import { HsFinderPanel } from './HsFinder.jsx'
+import { RuleIcon } from './art.jsx'
 
 const SUGGESTIONS = ['What is an HS code?', 'What is a commercial invoice?', 'Why does my pallet weight matter?', 'What does red vs amber mean?']
 
+// Floating dock: HS code finder + shipping help. One panel open at a time.
 export default function HelpWidget({ context }) {
-  const [open, setOpen] = useState(false)
+  const [panel, setPanel] = useState(null)
+  const open = panel === 'help'
+  const setOpen = (fn) => setPanel((p) => ((typeof fn === 'function' ? fn(p === 'help') : fn) ? 'help' : null))
+  const [items, setItems] = useState([])
+  const [request, setRequest] = useState(null)
+
+  useEffect(() => {
+    const onItems = (e) => setItems(e.detail || [])
+    const onOpen = (e) => { setRequest({ ...(e.detail || {}), nonce: Date.now() }); setPanel('hs') }
+    window.addEventListener('tuskers:items', onItems)
+    window.addEventListener('tuskers:open-hs', onOpen)
+    return () => { window.removeEventListener('tuskers:items', onItems); window.removeEventListener('tuskers:open-hs', onOpen) }
+  }, [])
   const [qa, setQa] = useState([])
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -28,7 +43,8 @@ export default function HelpWidget({ context }) {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end print:hidden">
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
+        {panel === 'hs' && <HsFinderPanel key="hs" onClose={() => setPanel(null)} items={items} request={request} />}
         {open && (
           <motion.div initial={{ opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.97 }}
             transition={{ duration: 0.28, ease }} style={{ transformOrigin: 'bottom right' }}
@@ -63,11 +79,19 @@ export default function HelpWidget({ context }) {
           </motion.div>
         )}
       </AnimatePresence>
-      <motion.button onClick={() => setOpen((o) => !o)} whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}
-        className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-float transition-shadow hover:shadow-[0_18px_40px_-14px_rgba(15,23,42,0.6)]">
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-xs font-bold text-slate-900">?</span>
-        {open ? 'Close help' : 'Help'}
-      </motion.button>
+      <div className="flex items-center gap-2">
+        <motion.button onClick={() => setPanel((p) => (p === 'hs' ? null : 'hs'))} whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}
+          className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold shadow-float transition-shadow hover:shadow-[0_18px_40px_-14px_rgba(15,23,42,0.45)]
+            ${panel === 'hs' ? 'bg-teal-700 text-white' : 'border border-slate-200 bg-white text-ink'}`}>
+          <RuleIcon id="R-01" className="h-4 w-4" />
+          {panel === 'hs' ? 'Close finder' : 'Find HS code'}
+        </motion.button>
+        <motion.button onClick={() => setOpen((o) => !o)} whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}
+          className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-float transition-shadow hover:shadow-[0_18px_40px_-14px_rgba(15,23,42,0.6)]">
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-xs font-bold text-slate-900">?</span>
+          {open ? 'Close help' : 'Help'}
+        </motion.button>
+      </div>
     </div>
   )
 }

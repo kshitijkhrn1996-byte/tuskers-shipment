@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ease } from './ui.jsx'
+import { hsBus } from '../api.js'
 
 const ORIGINS = ['London', 'Manchester', 'Birmingham', 'Leeds']
 const DESTS = { Germany: ['Berlin', 'Frankfurt', 'Hamburg'], France: ['Paris', 'Lyon'], Netherlands: ['Amsterdam', 'Rotterdam'] }
@@ -164,7 +165,8 @@ export default function BookingForm({ session, onSave, compact = false }) {
                 <Field label="Description" path={`items.${i}.description`} {...props} className="col-span-2">
                   {(cls) => <input value={val(it.description)} onChange={(e) => setItem(i, 'description', e.target.value)} className={`${inputCls} ${cls}`} placeholder="Ceramic coffee mug" />}
                 </Field>
-                <Field label="HS code" path={`items.${i}.hs_code`} {...props}>
+                <Field label={<>HS code <button type="button" onClick={(e) => { e.preventDefault(); hsBus.open({ query: it.description || '', item: i }) }}
+                  className="ml-1 font-semibold text-teal-700 hover:text-teal-900">Find</button></>} path={`items.${i}.hs_code`} {...props}>
                   {(cls) => (
                     <>
                       <input value={val(it.hs_code)} placeholder={isUnknown(i, 'hs_code') ? "Don't know" : '6+ digits'} disabled={isUnknown(i, 'hs_code')}

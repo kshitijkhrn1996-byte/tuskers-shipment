@@ -1,5 +1,6 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import { Rich, StatusIcon, Tooltip, TrafficLight, ease } from './ui.jsx'
+import { hsBus } from '../api.js'
 import { RuleIcon } from './art.jsx'
 import { ReadinessRing } from './insights.jsx'
 
@@ -22,7 +23,7 @@ export function issuesFromReport(report) {
   if (!report) return []
   const fails = report.checks.filter((c) => c.status === 'fail')
     .map((c) => ({ key: c.rule_id, rule_id: c.rule_id, severity: c.severity, message: c.fault, fix: c.fix }))
-  const notes = (report.advisories || []).map((a, i) => ({ key: `adv-${i}`, rule_id: null, severity: 'Amber', message: a.message, fix: a.fix }))
+  const notes = (report.advisories || []).map((a, i) => ({ key: `adv-${i}`, rule_id: null, severity: a.severity || 'Amber', message: a.message, fix: a.fix, kind: a.kind, query: a.query }))
   return [...fails, ...notes]
 }
 
@@ -143,7 +144,7 @@ export function IssueCard({ issue, index = 0, compact = false }) {
       <div className="flex items-center gap-2">
         <StatusIcon status={s.icon} />
         {issue.rule_id && <span className={`font-mono text-[11px] font-medium rounded-md px-1.5 py-0.5 ${s.id}`}>{issue.rule_id}</span>}
-        <span className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${s.tag}`}>{issue.rule_id ? s.label : issue.severity === 'Red' ? 'Problem' : issue.severity === 'Amber' ? 'Check this' : 'Note'}</span>
+        <span className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${s.tag}`}>{issue.rule_id ? s.label : issue.kind === 'hs' ? 'HS database' : issue.kind === 'sku' ? 'Product records' : issue.severity === 'Red' ? 'Problem' : issue.severity === 'Amber' ? 'Check this' : 'Note'}</span>
       </div>
       <p className="mt-1.5 text-sm leading-relaxed text-slate-800"><Rich text={issue.message} /></p>
       {issue.fix && (
@@ -151,6 +152,12 @@ export function IssueCard({ issue, index = 0, compact = false }) {
           <svg viewBox="0 0 16 16" className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" /></svg>
           <span><span className="font-medium text-slate-700">Fix · </span><Rich text={issue.fix} /></span>
         </p>
+      )}
+      {issue.kind === 'hs' && (
+        <button onClick={() => hsBus.open({ query: issue.query, item: issue.field ? Number(issue.field.split('.')[1]) : null })}
+          className="btn-ghost mt-2.5 px-3 py-1 text-xs">
+          Find the right code
+        </button>
       )}
     </motion.li>
   )

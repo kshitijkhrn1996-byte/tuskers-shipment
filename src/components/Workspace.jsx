@@ -11,7 +11,7 @@ import { Collapse, ease } from './ui.jsx'
 import RouteMap from './RouteMap.jsx'
 import { Scene } from './art.jsx'
 import { LoadGauge, Reconcile, reconcileRows } from './insights.jsx'
-import { api, gbp0 } from '../api.js'
+import { api, gbp0, hsBus } from '../api.js'
 
 const greeting = () => newMessage('assistant',
   "Hi! Tell me about the shipment — what you're sending, where from and to, and anything else you know. I'll flag problems as we go and only ask for what's missing.")
@@ -53,6 +53,26 @@ export default function Workspace({ onContext }) {
   }, [session.id, applySnapshot])
 
   useEffect(() => { api.carriers().then(setCarriers).catch(() => {}) }, [])
+
+  // HS finder (in the floating dock) needs the products, and can write a code back to one of them
+  const latest = useRef(session)
+  latest.current = session
+  useEffect(() => {
+    hsBus.items(session.draft.items.map((it, index) => ({ index, description: it.description, hs_code: it.hs_code })))
+  }, [session.draft.items])
+  useEffect(() => {
+    const onApply = (e) => {
+      const { index, code } = e.detail
+      const draft = JSON.parse(JSON.stringify(latest.current.draft))
+      if (!draft.items[index]) return
+      draft.items[index].hs_code = code
+      draft.unknown = (draft.unknown || []).filter((k) => k !== `items.${index}.hs_code`)
+      setSession((s) => ({ ...s, draft }))
+      saveForm(draft)
+    }
+    window.addEventListener('tuskers:apply-hs', onApply)
+    return () => window.removeEventListener('tuskers:apply-hs', onApply)
+  }, [saveForm])
 
   const startOver = () => { setSession(NEW_SESSION); setMessages([greeting()]) }
 
